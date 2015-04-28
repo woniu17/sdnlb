@@ -1,0 +1,5 @@
+rm /tmp/sdnlb.db
+mysql -uroot -p123 -e"drop database if exists sdnlb;"
+mysql -uroot -p123 -e"create database sdnlb;"
+python manage.py syncdb
+python manage.py runserver 0.0.0.0:8088

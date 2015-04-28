@@ -1,0 +1,14 @@
+<html>
+	<head>
+		<title>Load Balancer APP!</title>
+		<meta http-equiv=Content-Type content="text/html;charset=utf-8">
+	</head>
+	<body>
+		<h1>Hello, This is Load Balancer APP!</h1>
+        {% for h in host_list %}
+            <div class="host">
+                <h3>{{h}}</h3>
+            </div>
+        {% endfor %}
+	</body>
+</html>

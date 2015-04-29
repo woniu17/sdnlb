@@ -2,13 +2,78 @@
 	<head>
 		<title>Load Balancer APP!</title>
 		<meta http-equiv=Content-Type content="text/html;charset=utf-8">
+        <style type="text/css">
+            .host_list, .pool_list, .member_list{margin-left: 20px; margin-top:10px;}
+            .host, .member{margin-bottom: 10px;}
+            .vip span{color: red;}
+            .pool span{color: blue;}
+            .member span{color: black;}
+        </style>
+        <script type="text/javascript" src="http://code.jquery.com/jquery-1.11.2.min.js"></script>
+        <script type="text/javascript">
+          $(document).ready(function(){
+              // modify vip
+              $('.vip_modifition_button').click(function(){
+                  var vid = $(this).parents('.vip').attr('vid');
+                  console.log('modify vip ' + vid);
+              });
+              // delete member
+              $('.member_deletion_button').click(function(){
+                  var mid = $(this).parents('.member').attr('mid');
+                  console.log('delete member ' + mid);
+              });
+              // modify member
+              $('.member_modifition_button').click(function(){
+                  var mid = $(this).parents('.member').attr('mid');
+                  console.log('modify member ' + mid);
+              });
+              // add member
+              $('.member_addition_button').click(function(){
+                  var hid = $(this).parents('.host').attr('hid');
+                  console.log('add host ' + hid);
+              });
+          });
+        </script>
 	</head>
 	<body>
 		<h1>Hello, This is Load Balancer APP!</h1>
+        <hr/>
+        <h2>Host list</h2>
+        <div class="host_list">
         {% for h in host_list %}
-            <div class="host">
-                <h3>{{h}}</h3>
+        <div class="host" hid="{{h.hid}}">
+                <span>{{h}}
+                    &nbsp;&nbsp;<input type="button" value="添加" class="member_addition_button"/>
+                </span>
             </div>
         {% endfor %}
+        </div>
+        <hr/>
+        <div class="vip_list">
+        <h2>VIP list</h2>
+        {% for vip in vip_list %}
+        <div class="vip" vid="{{vip.vid}}">
+                <span>{{vip}}
+                    &nbsp;&nbsp;<input type="button" value="修改" class="vip_modifition_button"/>
+                <div class="pool_list">
+                {% for pool in vip.lbpool_set.all %}
+                    <div class="pool">
+                        <span>{{pool}}</span>
+                        <div class="member_list">
+                        {% for member in pool.lbmember_set.all %}
+                        <div class="member" mid="{{member.mid}}">
+                          <span>{{member}} 
+                            &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button"/>
+                            &nbsp;&nbsp;<input type="button" value="删除" class="member_deletion_button"/>
+                          </span>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
 	</body>
 </html>

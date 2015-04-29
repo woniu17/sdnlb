@@ -18,12 +18,17 @@ sudo ip tuntap add mode tap br0-eth3
 sudo ip link set br0-eth3 up
 sudo ovs-vsctl add-port br0 br0-eth3
 
+sudo ip tuntap del mode tap br0-eth4
+sudo ip tuntap add mode tap br0-eth4
+sudo ip link set br0-eth4 up
+sudo ovs-vsctl add-port br0 br0-eth4
+
 sudo ip tuntap del mode tap br0-eth0
 sudo ip tuntap add mode tap br0-eth0
 sudo ip link set br0-eth0 up
 sudo ovs-vsctl add-port br0 br0-eth0
-sudo ifconfig br0-eth0 10.0.0.100 netmask 255.255.255.0
+#sudo ifconfig br0-eth0 10.0.0.100 netmask 255.255.255.0
 
-VBoxManage startvm debian-01 --type gui
-VBoxManage startvm debian-02 --type gui
-VBoxManage startvm debian-03 --type gui
+#VBoxManage startvm debian-01 --type gui
+#VBoxManage startvm debian-02 --type gui
+#VBoxManage startvm debian-03 --type gui

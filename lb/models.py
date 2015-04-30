@@ -42,7 +42,7 @@ class LBPool(models.Model):
 
 
 class LBMember(models.Model):
-    mid = models.AutoField(primary_key=True)
+    mid = models.CharField(max_length=17, primary_key=True)
     address = models.CharField(max_length=17, null=True)
     naddress = models.CharField(max_length=17, null=True)
     port = models.CharField(max_length=10, null=True)

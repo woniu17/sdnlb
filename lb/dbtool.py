@@ -115,7 +115,7 @@ def sync_member():
     LBMember.objects.all().delete()
     for member in member_list:
         m = LBMember()
-        m.mid = int(member['id'])
+        m.mid = member['id']
         m.address = member['address']
         m.port = member['port']
         m.pool = LBPool.objects.get(pid=int(member['poolId']))
@@ -135,10 +135,10 @@ def add_vip(vip):
     resdata = httpres.read()
     conn.close()
     print 'status: %s, reason: %s' % (status, reason)
-    if int(status) != 200:
-        return
-    vip_ = json.loads(resdata)
-    print 'add vip: %s' % (vip_,) 
+    if int(status) == 200:
+        vip_ = json.loads(resdata)
+        print 'add vip: %s' % (vip_,) 
+    return status, reason, resdata
 
 def add_pool(pool):
     global CONTROLLER_HOST
@@ -153,10 +153,10 @@ def add_pool(pool):
     resdata = httpres.read()
     conn.close()
     print 'status: %s, reason: %s' % (status, reason)
-    if int(status) != 200:
-        return
-    pool_ = json.loads(resdata)
-    print 'add pool: %s' % (pool_,) 
+    if int(status) == 200:
+        pool_ = json.loads(resdata)
+        print 'add pool: %s' % (pool_,) 
+    return status, reason, resdata
     
 def add_member(member):
     global CONTROLLER_HOST
@@ -171,11 +171,19 @@ def add_member(member):
     resdata = httpres.read()
     conn.close()
     print 'status: %s, reason: %s' % (status, reason)
-    if int(status) != 200:
-        return
-    member_ = json.loads(resdata)
-    print 'add member: %s' % (member_,) 
+    if int(status) == 200:
+        member_ = json.loads(resdata)
+        print 'add member: %s' % (member_,) 
+    return status, reason, resdata
 
+def del_vip(vip):
+    print 'to be implememt'
+    pass
+
+def del_pool(pool):
+    print 'to be implememt'
+    pass
+  
 def del_member(member):
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
@@ -189,9 +197,40 @@ def del_member(member):
     resdata = httpres.read()
     conn.close()
     print 'status: %s, reason: %s' % (status, reason)
-    if int(status) != 200:
-        return
-    res = 'success' if int(resdata) == 0 else 'failure'
-    print 'del member %s %s' % (member, res) 
-    res = True if int(resdata) == 0 else False
-    return res
+    if int(status) == 200:
+        print 'del member: %s' % (member,) 
+    return status, reason, resdata
+
+def upd_vip(vip):
+    status, reason, resdata = add_vip(vip)
+    if int(status) == 200:
+        vip_ = json.loads(resdata)
+        print 'update vip: %s [last add-operation is actually update-operation]' % (vip_,) 
+    return status, reason, resdata
+
+def upd_vip(pool):
+    status, reason, resdata = add_pool(pool)
+    if int(status) == 200:
+        pool_ = json.loads(resdata)
+        print 'update pool: %s [last add-operation is actually update-operation]' % (pool_,) 
+    return status, reason, resdata
+
+def upd_member(member):
+    status, reason, resdata = add_member(member)
+    if int(status) == 200:
+        member_ = json.loads(resdata)
+        print 'update member: %s [last add-operation is actually update-operation]' % (member_,) 
+    return status, reason, resdata
+
+def check_member(member_):
+    #member_01 = '{"id":"1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
+    valid = True
+    if 'id' not in member_:
+        valid = False
+    if 'pool_id' not in member_:
+        valid = False
+    if 'address' not in member_:
+        valid = False
+    if 'port' not in member_:
+        valid = False
+    return valid

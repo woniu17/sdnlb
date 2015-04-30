@@ -20,6 +20,15 @@
               // delete member
               $('.member_deletion_button').click(function(){
                   var mid = $(this).parents('.member').attr('mid');
+                  $.ajax({
+                      type: 'POST',
+                      url: 'ajax_del_member',
+                      data:'mid='+mid ,
+                      success:function(data) {
+                            alter('delete member success');
+                      },
+                      error:function() {},
+                  });
                   console.log('delete member ' + mid);
               });
               // modify member
@@ -29,8 +38,23 @@
               });
               // add member
               $('.member_addition_button').click(function(){
-                  var hid = $(this).parents('.host').attr('hid');
-                  console.log('add host ' + hid);
+                  var ipv4 = $(this).parents('.host').attr('ipv4');
+                  var port = $(this).parents('.host').attr('port');
+                  var mid = ipv4;
+                  var pid = $('.pool').attr('pid');
+                  var member_list = $('.member');
+                  //console.log('length: ' + member_list.size())
+                  for (var i=0; i<member_list.size(); i++){
+                      member = member_list[i]
+                      //console.log('member.id: ' + $(member).attr('mid'));
+                      if (mid == $(member).attr('mid')){
+                            alert('member alreadly exist!!');
+                            return;
+                      } 
+                  }
+                  //member = '{"id":"1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
+                  var member = '{"id":"'+mid+'", "pool_id":"'+pid+'", "address":"'+ipv4+'", "port":"'+port+'"}'
+                  console.log('add member ' + member);
               });
           });
         </script>
@@ -41,7 +65,7 @@
         <h2>Host list</h2>
         <div class="host_list">
         {% for h in host_list %}
-        <div class="host" hid="{{h.hid}}">
+        <div class="host" ipv4="{{h.ipv4}}" port="80">
                 <span>{{h}}
                     &nbsp;&nbsp;<input type="button" value="添加" class="member_addition_button"/>
                 </span>
@@ -57,7 +81,7 @@
                     &nbsp;&nbsp;<input type="button" value="修改" class="vip_modifition_button"/>
                 <div class="pool_list">
                 {% for pool in vip.lbpool_set.all %}
-                    <div class="pool">
+                <div class="pool" pid="{{pool.pid}}">
                         <span>{{pool}}</span>
                         <div class="member_list">
                         {% for member in pool.lbmember_set.all %}

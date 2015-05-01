@@ -5,7 +5,30 @@ from django.shortcuts import render_to_response, render
 from models import *
 from dbtool import *
 import json
+import functools
+import monitor
 
+def check_daemon(f):
+    @functools.wraps(f)
+    def fn(*args, **argskw):
+        print 'check daemon'
+        if monitor.MONITOR_DAEMON and monitor.MONITOR_DAEMON.is_alive():
+            print 'daemon is alive'
+            return f(*args, **argskw)
+
+        print 'monitor.MONITOR_DAEMON:', monitor.MONITOR_DAEMON
+        print 'daemon is not alive, start it!!!'
+        monitor.monitor_daemon(right_now = False)
+        return f(*args, **argskw)
+    return fn
+def log(f):
+    @functools.wraps(f)
+    def fn(*args, **argskw):
+        print 'call lb.%s' % (f.__name__, )
+        return f(*args, **argskw)
+    return fn
+
+@log
 def init():
     sync_host()
     sync_vip()
@@ -24,6 +47,8 @@ def init():
         sync_pool()
         sync_member()
 
+@log
+@check_daemon
 def home(request):
 
     init()
@@ -31,41 +56,61 @@ def home(request):
     vip_list = LBVip.objects.all()
     return render(request, 'lb/index.html', {'host_list':host_list, 'vip_list':vip_list})
 
+@log
+@check_daemon
 def ajax_del_member(request):
     print 'ajax del member'
     if 'mid' not in request.POST:
       return HttpResponse('{"status":"-1", "reason":"form has not mid","data":"no"}', mimetype='application/javascript')
     mid = request.POST['mid']
-    member = '{"member":"%s"}' % (mid,)
-    return HttpResponse('{"status":"0", "reason":"success", "data":"no"}', mimetype='application/javascript')
-    status_reason_data = del_member(member)
-    return status_reason_data
+    #print 'member:', mid
+    status_reason_resdata = del_member(mid)
+    res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_resdata
+    return HttpResponse(res, mimetype='application/javascript')
     pass
 
+@log
+@check_daemon
 def ajax_del_pool(request):
     pass
 
+@log
+@check_daemon
 def ajax_del_vip(request):
     pass
 
+@log
+@check_daemon
 def ajax_add_member(request):
     if 'member' not in request.POST:
-      return '{"status":"-1", "reason":"form has not member","data":"no"}'
+        res = '{"status":"-1", "reason":"form has not member","data":"no"}'
+        print 'res:', res
+        return HttpResponse(res, mimetype='application/javascript')
     member = request.POST['member']
     member_ = json.loads(member)
     valid = check_member(member_)
     if not valid:
-      return '{"status":"-1", "reason":"member info not complete: %s","data":"no"}' % (member,)
+        res = '{"status":"-1", "reason":"member info not complete: %s","data":"no"}' % (member,)
+        print 'res:', res
+        return HttpResponse(res, mimetype='application/javascript')
     status_reason_data = add_member(member)
-    return status_reason_data
+    res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_data
+    print 'res:', res
+    return HttpResponse(res, mimetype='application/javascript')
     pass
 
+@log
+@check_daemon
 def ajax_add_pool(request):
     pass
 
+@log
+@check_daemon
 def ajax_add_vip(request):
     pass
 
+@log
+@check_daemon
 def ajax_upd_member(request):
     if 'member' not in request.POST:
       return '{"status":"-1", "reason":"form has not member","data":"no"}'
@@ -81,9 +126,13 @@ def ajax_upd_member(request):
     return status_reason_data
     pass
 
+@log
+@check_daemon
 def ajax_upd_pool(request):
     pass
 
+@log
+@check_daemon
 def ajax_upd_vip(request):
     pass
 

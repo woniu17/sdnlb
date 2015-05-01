@@ -2,13 +2,17 @@
 import json
 import httplib, urllib
 from models import *
+from django.core.exceptions import ObjectDoesNotExist
 CONTROLLER_HOST = '127.0.0.1:8080'
 
 def sendhttp(host, url='/', data=None, method='GET', headers=None):
-    if headers == None:
-        headers = { 'Content-type':'application/x-www-form-urlencoded', 'Accept':'text/plain', }
+    if method == 'PUT' or method == 'POST':
+        #headers = { 'Content-type':'application/javascript', 'Accept':'text/plain', }
+        pass
     conn = httplib.HTTPConnection(host)
-    conn.request(method, url, data, headers)
+    print 'method:', method, 'host:', host, 'url:',url, 'data:', data
+    #conn.request(method, url, data, headers)
+    conn.request(method, url, data,)
     return conn
 
 def sync_host():
@@ -61,16 +65,30 @@ def sync_vip():
         return
     vip_list = json.loads(resdata)
 
-    LBVip.objects.all().delete()
+    #set all LBVip unfresh
+    v_list = LBVip.objects.all()
+    for v in v_list:
+        v.fresh = False
+
+    #refresh LBVip
     for vip in vip_list:
-        v = LBVip()
-        v.vid = int(vip['id'])
+        v = None
+        try :
+            v = LBVip.objects.get(vid=vip['id'])
+        except ObjectDoesNotExist:
+            print 'vip' ,vip['id'], 'does not exist'
+            v = LBVip()
+            v.vid = vip['id']
         v.name = vip['name']
         v.protocol = vip['protocol']
         v.address = vip['address']
         v.port = vip['port']
+        v.fresh = True
         v.save()
         print v
+
+    #delete unfreshed LBVip
+    v_list.filter(fresh=False).delete()
 
 def sync_pool():
     global CONTROLLER_HOST
@@ -87,15 +105,29 @@ def sync_pool():
         return
     pool_list = json.loads(resdata)
 
-    LBPool.objects.all().delete()
+    #set all LBPool unfresh
+    p_list = LBPool.objects.all()
+    for p in p_list:
+        p.fresh = False
+
+    #refresh LBPool
     for pool in pool_list:
-        p = LBPool()
-        p.pid = int(pool['id'])
+        p = None
+        try :
+            p = LBPool.objects.get(pid=pool['id'])
+        except ObjectDoesNotExist:
+            print 'pool' ,pool['id'], 'does not exist'
+            p = LBPool()
+            p.pid = pool['id']
         p.name = pool['name']
         #p.protocol = pool['protocol']
         p.vip = LBVip.objects.get(vid=int(pool['vipId']))
+        p.fresh = True
         p.save()
         print p
+
+    #delete unfreshed LBPool
+    p_list.filter(fresh=False).delete()
 
 def sync_member():
     global CONTROLLER_HOST
@@ -112,15 +144,29 @@ def sync_member():
         return
     member_list = json.loads(resdata)
 
-    LBMember.objects.all().delete()
+    #set all LBMember unfresh
+    m_list = LBMember.objects.all()
+    for m in m_list:
+        m.fresh = False
+
+    #refresh LBMember
     for member in member_list:
-        m = LBMember()
-        m.mid = member['id']
+        m = None
+        try :
+            m = LBMember.objects.get(mid=member['id'])
+        except ObjectDoesNotExist:
+            print 'member' ,member['id'], 'does not exist'
+            m = LBMember()
+            m.mid = member['id']
+
         m.address = member['address']
         m.port = member['port']
         m.pool = LBPool.objects.get(pid=int(member['poolId']))
+        m.fresh = True
         m.save()
         print m
+    #delete unfreshed LBMember
+    m_list.filter(fresh=False).delete()
 
 def add_vip(vip):
     global CONTROLLER_HOST
@@ -184,11 +230,13 @@ def del_pool(pool):
     print 'to be implememt'
     pass
   
-def del_member(member):
+def del_member(mid):
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
-    url = '/quantum/v1.0/members/'
-    data = member
+    member = mid
+    url = '/quantum/v1.0/members/%s' % (member,)
+    #print 'url:', url
+    data = None
     method = 'DELETE'
     conn = sendhttp(host, url, data, method,)
     httpres = conn.getresponse()

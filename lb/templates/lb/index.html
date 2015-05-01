@@ -8,6 +8,7 @@
             .vip span{color: red;}
             .pool span{color: blue;}
             .member span{color: black;}
+            .hidden{display:none;}
         </style>
         <script type="text/javascript" src="http://code.jquery.com/jquery-1.11.2.min.js"></script>
         <script type="text/javascript">
@@ -23,13 +24,18 @@
                   $.ajax({
                       type: 'POST',
                       url: 'ajax_del_member',
-                      data:'mid='+mid ,
-                      success:function(data) {
-                            alter('delete member success');
+                      data: 'mid='+mid ,
+                      dataType: 'text',
+                      success: function(data) {
+                            //alert(data);
+                            window.location.reload();
                       },
-                      error:function() {},
+                      error: function(XMLHttpRequest, textStatus, errorThrown){
+                            var status = XMLHttpRequest.status
+                            var state = XMLHttpRequest.readyState
+                            alert('status:'+status+', state:'+state+',textStatus:'+textStatus);
+                      },
                   });
-                  console.log('delete member ' + mid);
               });
               // modify member
               $('.member_modifition_button').click(function(){
@@ -54,7 +60,21 @@
                   }
                   //member = '{"id":"1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
                   var member = '{"id":"'+mid+'", "pool_id":"'+pid+'", "address":"'+ipv4+'", "port":"'+port+'"}'
-                  console.log('add member ' + member);
+                  $.ajax({
+                      type: 'POST',
+                      url: 'ajax_add_member',
+                      data: 'member=' + member,
+                      dataType: 'text',
+                      success: function(data) {
+                            //alert(data);
+                            window.location.reload();
+                      },
+                      error: function(XMLHttpRequest, textStatus, errorThrown){
+                            var status = XMLHttpRequest.status
+                            var state = XMLHttpRequest.readyState
+                            alert('status:'+status+', state:'+state+',textStatus:'+textStatus);
+                      },
+                  });
               });
           });
         </script>
@@ -87,7 +107,17 @@
                         {% for member in pool.lbmember_set.all %}
                         <div class="member" mid="{{member.mid}}">
                           <span>{{member}} 
-                            &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button"/>
+                            &nbsp;&nbsp;{{member.req_count}}
+                            &nbsp;&nbsp;{{member.kb_count}}
+                            &nbsp;&nbsp;{{member.cpu_load}}
+                            &nbsp;&nbsp;{{member.uptime}}
+                            &nbsp;&nbsp;{{member.req_per_sec}}
+                            &nbsp;&nbsp;{{member.byte_per_sec}}
+                            &nbsp;&nbsp;{{member.byte_per_req}}
+                            &nbsp;&nbsp;{{member.busy_workers}}
+                            &nbsp;&nbsp;{{member.idle_workers}}
+                            &nbsp;&nbsp;{{member.update_time}}
+                            &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button hidden"/>
                             &nbsp;&nbsp;<input type="button" value="删除" class="member_deletion_button"/>
                           </span>
                             </div>

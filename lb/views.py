@@ -41,8 +41,8 @@ def init():
     if len(LBVip.objects.all()) <= 0:
         add_vip(vip)
         add_pool(pool)
-        add_member(member_01)
-        add_member(member_02)
+        #add_member(member_01)
+        #add_member(member_02)
         sync_vip()
         sync_pool()
         sync_member()
@@ -134,5 +134,13 @@ def ajax_upd_pool(request):
 @log
 @check_daemon
 def ajax_upd_vip(request):
+    pass
+
+@log
+@check_daemon
+def ajax_get_member_list(request):
+    from django.core import serializers
+    member_list = serializers.serialize('json', LBMember.objects.all())
+    return HttpResponse(member_list, mimetype='application/javascript')
     pass
 

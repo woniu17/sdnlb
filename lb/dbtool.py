@@ -69,6 +69,7 @@ def sync_vip():
     v_list = LBVip.objects.all()
     for v in v_list:
         v.fresh = False
+        v.save() #must save, because the filter(fresh=False) will retrive from db
 
     #refresh LBVip
     for vip in vip_list:
@@ -109,6 +110,7 @@ def sync_pool():
     p_list = LBPool.objects.all()
     for p in p_list:
         p.fresh = False
+        p.save() #must save, because the filter(fresh=False) will retrive from db
 
     #refresh LBPool
     for pool in pool_list:
@@ -139,15 +141,18 @@ def sync_member():
     reason = httpres.reason
     resdata = httpres.read()
     conn.close()
-    print 'status: %s, reason: %s' % (status, reason)
+    #print 'status: %s, reason: %s' % (status, reason)
     if int(status) != 200:
+        print 'sync member fail!!'
         return
     member_list = json.loads(resdata)
+    print 'member_list.length:' , len(member_list)
 
     #set all LBMember unfresh
     m_list = LBMember.objects.all()
     for m in m_list:
         m.fresh = False
+        m.save() #must save, because the filter(fresh=False) will retrive from db
 
     #refresh LBMember
     for member in member_list:
@@ -166,6 +171,8 @@ def sync_member():
         m.save()
         print m
     #delete unfreshed LBMember
+    #print 'm_list.length:', len(m_list)
+    #print 'm_list.fresh(False).length:', len(m_list.filter(fresh=False))
     m_list.filter(fresh=False).delete()
 
 def add_vip(vip):

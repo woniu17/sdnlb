@@ -5,19 +5,18 @@
         <style type="text/css">
             .host_list, .pool_list, .member_list{margin-left: 20px; margin-top:10px;}
             .host, .member{margin-bottom: 10px;}
-            .vip span{color: red;}
-            .pool span{color: blue;}
-            .member span{color: black;}
+            .host > span{display:inline-block; width:300px;}
+            .vip > span{color: red;}
+            .pool > span{color: blue;}
+            .member_list > span{color: black; display:inline-block; width:80px;}
+            span.w110{display:inline-block; width:110px;}
+            span.w80{display:inline-block; width:80px;}
+            span.w90{display:inline-block; width:90px;}
             .hidden{display:none;}
         </style>
         <script type="text/javascript" src="http://code.jquery.com/jquery-1.11.2.min.js"></script>
         <script type="text/javascript">
-          $(document).ready(function(){
-              // modify vip
-              $('.vip_modifition_button').click(function(){
-                  var vid = $(this).parents('.vip').attr('vid');
-                  console.log('modify vip ' + vid);
-              });
+          function bind_event_for_member(){
               // delete member
               $('.member_deletion_button').click(function(){
                   var mid = $(this).parents('.member').attr('mid');
@@ -76,19 +75,84 @@
                       },
                   });
               });
+
+          }
+          function update_member_list(){
+              $.ajax({
+                  type: 'POST',
+                  url: 'ajax_get_member_list',
+                  data: 'none=none',
+                  dataType: 'text',
+                  success: function(data) {
+                        var member_list = $.parseJSON(data);
+                        //console.log('member_list:'+data);
+                        $('.member').remove();
+                        for (var i=0; i<member_list.length; i++){
+                            var m = member_list[i];
+                            $('#member_template').attr('mid', m['pk']);
+                            $('#member_template span.member_span').html(m['pk']+':'+m['fields']['port']);
+                            $('#member_template span.req_count').html(m['fields']['req_count']);
+                            $('#member_template span.kb_count').html(m['fields']['kb_count']);
+                            $('#member_template span.cpu_load').html(m['fields']['cpu_load']);
+                            $('#member_template span.uptime').html(m['fields']['uptime']);
+                            $('#member_template span.req_per_sec').html(m['fields']['req_per_sec']);
+                            $('#member_template span.byte_per_sec').html(m['fields']['byte_per_sec']);
+                            $('#member_template span.byte_per_req').html(m['fields']['byte_per_req']);
+                            $('#member_template span.busy_workers').html(m['fields']['busy_workers']);
+                            $('#member_template span.idle_workers').html(m['fields']['idle_workers']);
+                            $('#member_template span.update_time').html(m['fields']['update_time']);
+                            //console.log('member:'+$('#member_template').prop('outerHTML'));
+                            //$('.member_list').append($('#member_template').prop('outerHTML'));
+                            $('.member_list').append($('#member_template').clone());
+                            $('.member_list div.member_template').removeClass('member_template').addClass('member').removeAttr('id');
+                        }
+                        bind_event_for_member();
+                  },
+                  error: function(XMLHttpRequest, textStatus, errorThrown){
+                        var status = XMLHttpRequest.status
+                        var state = XMLHttpRequest.readyState
+                        alert('status:'+status+', state:'+state+',textStatus:'+textStatus);
+                  },
+              });
+          }
+          $(document).ready(function(){
+              // modify vip
+              $('.vip_modifition_button').click(function(){
+                  var vid = $(this).parents('.vip').attr('vid');
+                  console.log('modify vip ' + vid);
+              });
+              bind_event_for_member();
+              setInterval(update_member_list, 10000);
           });
         </script>
 	</head>
 	<body>
+<div class="hidden">
+<div id="member_template" class="member_template" mid="">
+  <span class="member_span w110"></span>
+  <span class="req_count w80"></span>
+  <span class="kb_count w80"></span>
+  <span class="cpu_load w90"></span>
+  <span class="uptime w80"></span>
+  <span class="req_per_sec w90"></span>
+  <span class="byte_per_sec w80"></span>
+  <span class="byte_per_req w80"></span>
+  <span class="busy_workers w80"></span>
+  <span class="idle_workers w80"></span>
+  <span class="update_time w80"></span>
+  &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button hidden"/>
+  &nbsp;&nbsp;<input type="button" value="删除" class="member_deletion_button"/>
+</div>
+</div>
+
 		<h1>Hello, This is Load Balancer APP!</h1>
         <hr/>
         <h2>Host list</h2>
         <div class="host_list">
         {% for h in host_list %}
         <div class="host" ipv4="{{h.ipv4}}" port="80">
-                <span>{{h}}
+                <span>{{h}}</span>
                     &nbsp;&nbsp;<input type="button" value="添加" class="member_addition_button"/>
-                </span>
             </div>
         {% endfor %}
         </div>
@@ -97,31 +161,41 @@
         <h2>VIP list</h2>
         {% for vip in vip_list %}
         <div class="vip" vid="{{vip.vid}}">
-                <span>{{vip}}
-                    &nbsp;&nbsp;<input type="button" value="修改" class="vip_modifition_button"/>
+                <span>{{vip}}</span>
+                &nbsp;&nbsp;<input type="button" value="修改" class="vip_modifition_button"/>
                 <div class="pool_list">
                 {% for pool in vip.lbpool_set.all %}
                 <div class="pool" pid="{{pool.pid}}">
                         <span>{{pool}}</span>
                         <div class="member_list">
-                        {% for member in pool.lbmember_set.all %}
-                        <div class="member" mid="{{member.mid}}">
-                          <span>{{member}} 
-                            &nbsp;&nbsp;{{member.req_count}}
-                            &nbsp;&nbsp;{{member.kb_count}}
-                            &nbsp;&nbsp;{{member.cpu_load}}
-                            &nbsp;&nbsp;{{member.uptime}}
-                            &nbsp;&nbsp;{{member.req_per_sec}}
-                            &nbsp;&nbsp;{{member.byte_per_sec}}
-                            &nbsp;&nbsp;{{member.byte_per_req}}
-                            &nbsp;&nbsp;{{member.busy_workers}}
-                            &nbsp;&nbsp;{{member.idle_workers}}
-                            &nbsp;&nbsp;{{member.update_time}}
-                            &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button hidden"/>
-                            &nbsp;&nbsp;<input type="button" value="删除" class="member_deletion_button"/>
-                          </span>
+                                <span class="w110">LB Member</span>
+                                <span class="w80">请求数</span>
+                                <span class="w80">字节数(KB)</span>
+                                <span class="w90">CPU负载</span>
+                                <span class="w80">uptime</span>
+                                <span class="w90">ReqPerSec</span>
+                                <span class="w80">BytePerSec</span>
+                                <span class="w80">BytePerReq</span>
+                                <span class="w80">BusyWorkers</span>
+                                <span class="w80">IdleWorkers</span>
+                                <span class="w80">更新时间</span>
+                            {% for member in pool.lbmember_set.all %}
+                            <div class="member" mid="{{member.mid}}">
+                                <span class="member_span w110">{{member.naddress}}:{{member.port}}</span>
+                                <span class="req_count w80">{{member.req_count}}</span>
+                                <span class="kb_count w80">{{member.kb_count}}</span>
+                                <span class="cpu_load w90">{{member.cpu_load}}</span>
+                                <span class="uptime w80">{{member.uptime}}</span>
+                                <span class="req_per_sec w90">{{member.req_per_sec}}</span>
+                                <span class="byte_per_sec w80">{{member.byte_per_sec}}</span>
+                                <span class="byte_per_req w80">{{member.byte_per_req}}</span>
+                                <span class="busy_workers w80">{{member.busy_workers}}</span>
+                                <span class="idle_workers w80">{{member.idle_workers}}</span>
+                                <span class="update_time w80">{{member.update_time}}</span>
+                                &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button hidden"/>
+                                &nbsp;&nbsp;<input type="button" value="删除" class="member_deletion_button"/>
                             </div>
-                        {% endfor %}
+                            {% endfor %}
                         </div>
                     </div>
                 {% endfor %}

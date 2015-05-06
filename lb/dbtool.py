@@ -175,6 +175,160 @@ def sync_member():
     #print 'm_list.fresh(False).length:', len(m_list.filter(fresh=False))
     m_list.filter(fresh=False).delete()
 
+
+def get_lb_match(entry):
+
+  if str(entry).find('ipv4_') < 0:
+      return None
+
+  #print entry
+  if 'match' not in entry:
+      return None
+  match = entry['match']
+  if 'ipv4_src' in match:
+      return 'ipv4_src~%s' % match['ipv4_src']
+     
+  if 'ipv4_dst' in match:
+      return 'ipv4_dst~%s' % match['ipv4_dst']
+     
+  return None
+
+def sync_flow():
+    global CONTROLLER_HOST
+    host = CONTROLLER_HOST
+    
+    #get flow entry info1
+    url = '/wm/staticflowpusher/list/all/json'
+    conn = sendhttp(host, url,)
+    httpres = conn.getresponse()
+    status = httpres.status
+    reason = httpres.reason
+    resdata = httpres.read()
+    conn.close()
+    #print 'status: %s, reason: %s' % (status, reason)
+    if int(status) != 200:
+        print 'sync flow fail!!'
+        return
+    #print 'resdata:', resdata
+    flow_entry_dict = json.loads(resdata)
+    #print 'flow_entry_dict.length:' , len(flow_entry_dict)
+
+    info1_dict = {}
+    for switch, flow_entry_list in flow_entry_dict.iteritems():
+        #print 'switch:', switch
+        for entry in flow_entry_list:
+            #print 'flow entry:'
+            for key, val in entry.iteritems():
+                info1_dict[key] = val
+                fe = LBFlowEntry()
+                fe.eid = key
+                fe.info1 = str(val)
+                #print fe.eid, ':' , type(fe.info1), ':', fe.info1
+
+    print 'len(info1_dict):', len(info1_dict)
+    #get flow entry info2
+    url = '/wm/core/switch/all/flow/json'
+    conn = sendhttp(host, url,)
+    httpres = conn.getresponse()
+    status = httpres.status
+    reason = httpres.reason
+    resdata = httpres.read()
+    conn.close()
+    #print 'status: %s, reason: %s' % (status, reason)
+    if int(status) != 200:
+        print 'sync flow fail!!'
+        return
+    #print 'resdata:', resdata
+    flow_entry_dict = json.loads(resdata)
+    #print 'flow_entry_dict.length:' , len(flow_entry_dict)
+
+    info2_dict = {}
+    for switch, flow_entry_list in flow_entry_dict.iteritems():
+        #print 'switch:', switch
+        for entry in flow_entry_list['flows']:
+            #print 'flow entry:'
+            #print entry
+            lb_match = get_lb_match(entry)
+            if not lb_match:
+                continue
+            key = 'pinsw~' + switch +';'+ lb_match
+            info2 = str(entry)
+            info2_dict[key] = info2
+            print 'key:' + key
+            pass
+    print 'len(info2_dict):', len(info2_dict)
+
+
+    #get flow entry
+    fe_list = []
+    for eid, info1 in info1_dict.iteritems():
+        fe = LBFlowEntry()
+        fe.eid = str(eid)
+        fe.info1 = str(info1)
+        pinswmatch = fe.pinswmatch
+        #print 'pinswmatch:', pinswmatch
+        fe.info2 = str(info2_dict[pinswmatch])
+        #print 'fe.packet_count:', fe.packet_count
+        #print 'fe.fid:', fe.fid
+        fe_list.append(fe)
+
+    flow_dict = {}
+    for fe in fe_list:
+        fid = fe.get_fid()
+        if fid not in flow_dict:
+            flow_dict[fid] = LBFlow()
+            flow_dict[fid].fid = fid
+        fe.flow = flow_dict[fid]
+        fe.save()
+            
+    for fid, flow in flow_dict.iteritems():
+        #print 'flow.get_mid():', flow.get_mid()
+        #print 'LBMember.len:', len(LBMember.objects.all())
+        mid = flow.get_mid()
+        member = LBMember.objects.get(mid=mid)
+        flow.member = member
+        flow.save()
+
+    for fid, flow in flow_dict.iteritems():
+        #print 'fid:', fid, '; flow:', flow
+        inbound_entry_list = flow.inbound_entry_list
+        for entry in inbound_entry_list:
+           print 'inbound entry:', entry
+        outbound_entry_list = flow.outbound_entry_list
+        for entry in outbound_entry_list:
+           print 'outbound entry:', entry
+
+        
+
+    '''
+    #set all LBMember unfresh
+    m_list = LBMember.objects.all()
+    for m in m_list:
+        m.fresh = False
+        m.save() #must save, because the filter(fresh=False) will retrive from db
+
+    #refresh Flow
+    for member in member_list:
+        m = None
+        try :
+            m = LBMember.objects.get(mid=member['id'])
+        except ObjectDoesNotExist:
+            print 'member' ,member['id'], 'does not exist'
+            m = LBMember()
+            m.mid = member['id']
+
+        m.address = member['address']
+        m.port = member['port']
+        m.pool = LBPool.objects.get(pid=int(member['poolId']))
+        m.fresh = True
+        m.save()
+        print m
+    #delete unfreshed LBMember
+    #print 'm_list.length:', len(m_list)
+    #print 'm_list.fresh(False).length:', len(m_list.filter(fresh=False))
+    m_list.filter(fresh=False).delete()
+    '''
+
 def add_vip(vip):
     global CONTROLLER_HOST
     host = CONTROLLER_HOST

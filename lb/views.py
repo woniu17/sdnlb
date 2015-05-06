@@ -34,6 +34,7 @@ def init():
     sync_vip()
     sync_pool()
     sync_member()
+    sync_flow()
     vip = '{"id":"1", "name":"vip-01", "protocol":"icmp", "address":"10.0.0.200", "port":"80"}'
     pool = '{"id":"1", "name":"pool-01", "protocol":"icmp", "vip_id":"1"}'
     member_01 = '{"id":"10.0.0.1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
@@ -46,6 +47,7 @@ def init():
         sync_vip()
         sync_pool()
         sync_member()
+        sync_flow()
 
 @log
 @check_daemon

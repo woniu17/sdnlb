@@ -80,4 +80,88 @@ class LBMember(models.Model):
     def __unicode__(self,):
       return 'LBMember %s[%s:%s]' % (self.mid, self.naddress, self.port)
 
+class LBFlow(models.Model):
+    fid = models.CharField(max_length=217, primary_key=True)
+    #member = models.CharField(max_length=17)
+    member = models.ForeignKey(LBMember)
+
+    @property
+    def inbound_entry_list(self,):
+        #print 'len(entry):', len(self.lbflowentry_set.all())
+        return [ entry for entry in self.lbflowentry_set.all() if entry.eid.find('inbound') >= 0]
+
+    @property
+    def outbound_entry_list(self,):
+        #print 'len(entry):', len(self.lbflowentry_set.all())
+        return [ entry for entry in self.lbflowentry_set.all() if entry.eid.find('outbound') >= 0]
+
+    def get_mid(self,):
+        inbound_list = self.inbound_entry_list
+        for entry in inbound_list:
+            info1 = eval(entry.info1)
+            if 'instructions' not in info1:
+                continue
+            inst = info1['instructions']
+            if 'instruction_apply_actions' not in inst:
+                continue
+            actions = inst['instruction_apply_actions']
+            if 'ipv4_dst' not in actions:
+                continue
+            return actions['ipv4_dst']
+        return None
+            
+
+class LBFlowEntry(models.Model):
+    '''
+    info1: {u'outPort': u'any', u'outGroup': u'any', u'idleTimeoutSec': u'0', u'flags': u'1', 
+    u'priority': u'-32768', u'cookieMask': u'0', u'version': u'OF_13', 
+    u'cookie': u'45036000170862220', u'hardTimeoutSec': u'0', u'command': u'ADD',
+    u'match': {u'ip_proto': u'6', u'eth_type': u'0x800', u'ipv4_dst': u'10.0.0.100', u'in_port': u'1'},
+    u'instructions': {u'instruction_apply_actions': {u'eth_src': u'12:34:56:78:90:12', 
+    u'tcp_src': u'80', u'ipv4_src': u'10.0.0.200', u'output': u'2'}}}
+    '''
+    eid = models.CharField(max_length=217, primary_key=True)
+    info1 = models.CharField(max_length=1117, null=True)
+    info2 = models.CharField(max_length=1117, null=True)
+    flow = models.ForeignKey(LBFlow)
+    
+    def __unicode__(self,):
+        return 'entry: %s' % (self.eid,)
+
+    @property
+    def pinswmatch(self,):
+        pinsw = self.eid.split(';')[-1].split('~')[-1]
+        #print 'self.info1:', self.info1, type(self.info1)
+        #info1 = dict("{'a':'a'}")
+        info1 = eval(self.info1)
+        if 'match' not in info1:
+            return None
+        match = info1['match']
+        if 'ipv4_src' in match:
+            return 'pinsw~%s;ipv4_src~%s' % (pinsw, match['ipv4_src'])
+           
+        if 'ipv4_dst' in match:
+            return 'pinsw~%s;ipv4_dst~%s' % (pinsw, match['ipv4_dst'])
+        #print info1
+        return None
+    
+    @property
+    def packet_count(self,):
+      '''
+      info2 = {u'priority': u'32768', u'idleTimeoutSec': u'0', u'flags': u'1', u'durationSeconds': u'9785',
+      u'byteCount': u'488', u'version': u'OF_13', u'tableId': u'0x0', u'packetCount': u'6', 
+      u'hardTimeoutSec': u'0', u'cookie': u'45035997133399063', 
+      u'match': {u'ip_proto': u'6', u'eth_type': u'0x800', u'ipv4_src': u'10.0.0.100', u'in_port': u'1'}, 
+      u'instructions': {u'instruction_apply_actions': {u'output': u'2'}}}
+      '''
+      #print 'self.info2:', self.info2 , type(self.info2)
+      info2 = eval(self.info2)
+      return info2['packetCount']
+    
+    #eid: inbound-vip~1;client~10.0.0.100;srcsw~00:00:d2:c8:68:8a:2d:47;pinsw~00:00:d2:c8:68:8a:2d:47
+    #fid = vip + client
+    def get_fid(self,):
+        fid = self.eid.split(';')
+        fid = 'vip~%s;client~%s' % (fid[0].split('~')[-1], fid[1].split('~')[-1])
+        return fid
 

@@ -3,11 +3,13 @@
 		<title>Load Balancer APP!</title>
 		<meta http-equiv=Content-Type content="text/html;charset=utf-8">
         <style type="text/css">
-            .host_list, .pool_list, .member_list{margin-left: 20px; margin-top:10px;}
-            .host, .member{margin-bottom: 10px;}
+            .host_list, .pool_list, .member_list, .flow_list{margin-left: 20px; margin-top:10px;}
+            .host, .member{margin-top: 6px;margin-bottom: 6px;}
             .host > span{display:inline-block; width:300px;}
             .vip > span{color: red;}
             .pool > span{color: blue;}
+            .member > span{color: green;}
+            .flow > span{color: purple;}
             .member_list > span{color: black; display:inline-block; width:80px;}
             span.w110{display:inline-block; width:110px;}
             span.w80{display:inline-block; width:80px;}
@@ -121,8 +123,13 @@
                   var vid = $(this).parents('.vip').attr('vid');
                   console.log('modify vip ' + vid);
               });
-              bind_event_for_member();
+              //bind_event_for_member();
+              update_member_list()
               setInterval(update_member_list, 10000);
+              // member detail
+              $('.member_detail_button').click(function(){
+                  $('.member .flow_list').toggle();
+              });
           });
         </script>
 	</head>
@@ -137,11 +144,28 @@
   <span class="req_per_sec w90"></span>
   <span class="byte_per_sec w80"></span>
   <span class="byte_per_req w80"></span>
-  <span class="busy_workers w80"></span>
-  <span class="idle_workers w80"></span>
+  <span class="busy_workers w90"></span>
+  <span class="idle_workers w90"></span>
+  <span class="flow_count w80">100</span>
+  <span class="packet_count w80">100</span>
   <span class="update_time w80"></span>
-  &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button hidden"/>
-  &nbsp;&nbsp;<input type="button" value="删除" class="member_deletion_button"/>
+  <span class="w80"><input type="button" value="删除" class="member_deletion_button"/></span>
+  <span class="w80"><input type="button" value="修改" class="member_modifition_button hidden"/></span>
+  <div class="flow_list">
+      <span class="w80">Flow ID</span>
+      <span class="w80">FlowCount</span>
+      <span class="w80">PacketCount</span>
+    <div class="flow">
+      <span class="flow_id w80">1</span>
+      <span class="flow_count w80">100</span>
+      <span class="packet_count w80">100</span>
+    </div>
+    <div class="flow">
+      <span class="flow_id w80">2</span>
+      <span class="flow_count w80">100</span>
+      <span class="packet_count w80">100</span>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -176,10 +200,15 @@
                                 <span class="w90">ReqPerSec</span>
                                 <span class="w80">BytePerSec</span>
                                 <span class="w80">BytePerReq</span>
-                                <span class="w80">BusyWorkers</span>
-                                <span class="w80">IdleWorkers</span>
+                                <span class="w90">BusyWorkers</span>
+                                <span class="w90">IdleWorkers</span>
+                                <span class="w80">FlowCount</span>
+                                <span class="w80">PacketCount</span>
                                 <span class="w80">更新时间</span>
+                                <span class="w80"><input type="button" value="详情" class="member_detail_button"/></span>
                             {% for member in pool.lbmember_set.all %}
+                            {% endfor %}
+                            <!--
                             <div class="member" mid="{{member.mid}}">
                                 <span class="member_span w110">{{member.naddress}}:{{member.port}}</span>
                                 <span class="req_count w80">{{member.req_count}}</span>
@@ -189,13 +218,13 @@
                                 <span class="req_per_sec w90">{{member.req_per_sec}}</span>
                                 <span class="byte_per_sec w80">{{member.byte_per_sec}}</span>
                                 <span class="byte_per_req w80">{{member.byte_per_req}}</span>
-                                <span class="busy_workers w80">{{member.busy_workers}}</span>
-                                <span class="idle_workers w80">{{member.idle_workers}}</span>
+                                <span class="busy_workers w90">{{member.busy_workers}}</span>
+                                <span class="idle_workers w90">{{member.idle_workers}}</span>
                                 <span class="update_time w80">{{member.update_time}}</span>
                                 &nbsp;&nbsp;<input type="button" value="修改" class="member_modifition_button hidden"/>
                                 &nbsp;&nbsp;<input type="button" value="删除" class="member_deletion_button"/>
                             </div>
-                            {% endfor %}
+                            -->
                         </div>
                     </div>
                 {% endfor %}

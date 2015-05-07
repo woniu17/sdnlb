@@ -143,6 +143,9 @@ def ajax_upd_vip(request):
 def ajax_get_member_list(request):
     from django.core import serializers
     member_list = serializers.serialize('json', LBMember.objects.all())
+    #print member_list
+    flow_list = serializers.serialize('json', LBFlow.objects.all())
+    print flow_list
     return HttpResponse(member_list, mimetype='application/javascript')
     pass
 

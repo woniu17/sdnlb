@@ -65,7 +65,16 @@ def ajax_del_member(request):
     if 'mid' not in request.POST:
       return HttpResponse('{"status":"-1", "reason":"form has not mid","data":"no"}', mimetype='application/javascript')
     mid = request.POST['mid']
-    #print 'member:', mid
+    print 'member:', mid
+    try :
+        member = LBMember.objects.get(mid=mid)
+        for flow in member.lbflow_set.all():
+            print 'flow', flow.fid
+            del_flow(flow)
+    except ObjectDoesNotExist:
+        print 'Error!! There is no member %s to delete!' % (mid,)
+        pass
+
     status_reason_resdata = del_member(mid)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_resdata
     return HttpResponse(res, mimetype='application/javascript')
@@ -141,11 +150,16 @@ def ajax_upd_vip(request):
 @log
 @check_daemon
 def ajax_get_member_list(request):
+    #sync_member()
+    #sync_flow()
     from django.core import serializers
+    for member in LBMember.objects.all():
+        member.set_flow_list()
+        member.save()
     member_list = serializers.serialize('json', LBMember.objects.all())
     #print member_list
-    flow_list = serializers.serialize('json', LBFlow.objects.all())
-    print flow_list
+    #flow_list = serializers.serialize('json', LBFlow.objects.all())
+    #print flow_list
     return HttpResponse(member_list, mimetype='application/javascript')
     pass
 

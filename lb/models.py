@@ -67,6 +67,8 @@ class LBMember(models.Model):
     update_time = models.CharField(max_length=20, default='-1')
     #
     fresh = models.BooleanField(default=True)
+    #
+    flow_list = models.CharField(max_length=2217, null=True)
     
     @property
     def naddress(self,):
@@ -80,8 +82,23 @@ class LBMember(models.Model):
     def __unicode__(self,):
       return 'LBMember %s[%s:%s]' % (self.mid, self.naddress, self.port)
 
+    def set_flow_list(self,):
+        flow_list = self.lbflow_set.all()
+        tmp_flow_list = '['
+        first = True
+        for flow in flow_list:
+          if not first:
+            tmp_flow_list += ','
+          f = '{"fid":"%s","packet_count":"%s","duraction":"%s"}' % (flow.fid, flow.packet_count, flow.duraction)
+          tmp_flow_list += f
+          first = False
+        tmp_flow_list += "]"
+        #print 'flow_list:', tmp_flow_list
+        self.flow_list = tmp_flow_list
+
 class LBFlow(models.Model):
     fid = models.CharField(max_length=217, primary_key=True)
+    weight = models.FloatField(default=1.0)
     #member = models.CharField(max_length=17)
     member = models.ForeignKey(LBMember)
 
@@ -94,6 +111,14 @@ class LBFlow(models.Model):
     def outbound_entry_list(self,):
         #print 'len(entry):', len(self.lbflowentry_set.all())
         return [ entry for entry in self.lbflowentry_set.all() if entry.eid.find('outbound') >= 0]
+
+    @property
+    def packet_count(self,):
+        return self.outbound_entry_list[0].packet_count
+
+    @property
+    def duraction(self,):
+        return self.outbound_entry_list[0].duraction
 
     def get_mid(self,):
         inbound_list = self.inbound_entry_list
@@ -109,6 +134,9 @@ class LBFlow(models.Model):
                 continue
             return actions['ipv4_dst']
         return None
+
+    def get_network_id(self,):
+        return self.fid.split(';')[-1].split('~')[-1].split('.')[0]
             
 
 class LBFlowEntry(models.Model):
@@ -158,6 +186,11 @@ class LBFlowEntry(models.Model):
       info2 = eval(self.info2)
       return info2['packetCount']
     
+    @property
+    def duraction(self,):
+      info2 = eval(self.info2)
+      return info2['durationSeconds']
+
     #eid: inbound-vip~1;client~10.0.0.100;srcsw~00:00:d2:c8:68:8a:2d:47;pinsw~00:00:d2:c8:68:8a:2d:47
     #fid = vip + client
     def get_fid(self,):

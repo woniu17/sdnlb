@@ -193,6 +193,47 @@ def get_lb_match(entry):
      
   return None
 
+def push_flow():
+    flow_count = 0
+    mean_weight = 0
+    flow_list = LBFlow.objects.all()
+    for flow in flow_list:
+        flow.weight = float(flow.packet_count) / float(flow.duraction)
+        mean_weight += flow.weight
+        flow_count += 1
+    if flow_count > 0:
+        mean_weight /= flow_count
+    else:
+       mean_weight = 1
+    for flow in flow_list:
+        flow.weight /= mean_weight
+        flow.save()
+
+    global CONTROLLER_HOST
+    host = CONTROLLER_HOST
+    url = '/quantum/v1.0/lbflow/'
+    data = '{'
+    first = True
+    for flow in LBFlow.objects.all():
+        if not first:
+            data += ','
+        data += '"network_id":"%s", "weight":"%s", "member":"%s"' % (flow.get_network_id(), flow.weight, flow.member.mid)
+        first = False
+    data += '}'
+    #print data
+    #data = '{"network_id":"123", "weight":"123.123", "member":"10.0.0.1", "network_id":"234", "weight":"1.23", "member":"10.0.0.1"}'
+        
+    method = 'PUT'
+    conn = sendhttp(host, url, data, method)
+    httpres = conn.getresponse()
+    status = httpres.status
+    reason = httpres.reason
+    resdata = httpres.read()
+    conn.close()
+    #print 'status: %s, reason: %s' % (status, reason)
+    if int(status) != 200:
+        pass
+
 def sync_flow():
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
@@ -225,7 +266,7 @@ def sync_flow():
                 fe.info1 = str(val)
                 #print fe.eid, ':' , type(fe.info1), ':', fe.info1
 
-    print 'len(info1_dict):', len(info1_dict)
+    #print 'len(info1_dict):', len(info1_dict)
     #get flow entry info2
     url = '/wm/core/switch/all/flow/json'
     conn = sendhttp(host, url,)
@@ -248,15 +289,21 @@ def sync_flow():
         for entry in flow_entry_list['flows']:
             #print 'flow entry:'
             #print entry
+            #filter load balancer entry
+            if int(entry['cookie']) == 0x12345678:
+                #print 'cookie:', entry['cookie']
+                pass
+            else:
+                continue
             lb_match = get_lb_match(entry)
             if not lb_match:
                 continue
             key = 'pinsw~' + switch +';'+ lb_match
             info2 = str(entry)
             info2_dict[key] = info2
-            print 'key:' + key
+            #print 'key:' + key
             pass
-    print 'len(info2_dict):', len(info2_dict)
+    #print 'len(info2_dict):', len(info2_dict)
 
 
     #get flow entry
@@ -285,11 +332,15 @@ def sync_flow():
         #print 'flow.get_mid():', flow.get_mid()
         #print 'LBMember.len:', len(LBMember.objects.all())
         mid = flow.get_mid()
-        member = LBMember.objects.get(mid=mid)
-        flow.member = member
-        flow.save()
+        try :
+            member = LBMember.objects.get(mid=mid)
+            flow.member = member
+            flow.save()
+        except ObjectDoesNotExist:
+            pass
 
     for fid, flow in flow_dict.iteritems():
+        break
         #print 'fid:', fid, '; flow:', flow
         inbound_entry_list = flow.inbound_entry_list
         for entry in inbound_entry_list:
@@ -297,6 +348,7 @@ def sync_flow():
         outbound_entry_list = flow.outbound_entry_list
         for entry in outbound_entry_list:
            print 'outbound entry:', entry
+    push_flow()
 
         
 
@@ -443,3 +495,28 @@ def check_member(member_):
     if 'port' not in member_:
         valid = False
     return valid
+
+def del_flow(flow):
+    global CONTROLLER_HOST
+    host = CONTROLLER_HOST
+    url = '/wm/staticflowpusher/json'
+    #print 'url:', url
+    data = {}
+    method = 'DELETE'
+    entry_list = flow.lbflowentry_set.all()
+    for entry in entry_list:
+        print 'entry', entry.eid
+        data = '{"name":"%s"}' % (entry.eid)
+        conn = sendhttp(host, url, data, method,)
+        httpres = conn.getresponse()
+        status = httpres.status
+        reason = httpres.reason
+        resdata = httpres.read()
+        conn.close()
+        print 'status: %s, reason: %s' % (status, reason)
+        if int(status) != 200:
+            print 'fail to del flow entry %s!!!!' % (entry.eid,) 
+    #return status, reason, resdata
+    sync_flow()
+    return 'OK'
+  

@@ -68,7 +68,7 @@ class LBMember(models.Model):
     #
     fresh = models.BooleanField(default=True)
     #
-    flow_list = models.CharField(max_length=2217, null=True)
+    flow_list = models.CharField(max_length=5217, null=True)
     
     @property
     def naddress(self,):

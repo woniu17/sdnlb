@@ -33,12 +33,12 @@ def init():
     sync_host()
     sync_vip()
     sync_pool()
-    sync_member()
-    sync_flow()
+    #sync_member()
+    #sync_flow()
     vip = '{"id":"1", "name":"vip-01", "protocol":"icmp", "address":"10.0.0.200", "port":"80"}'
     pool = '{"id":"1", "name":"pool-01", "protocol":"icmp", "vip_id":"1"}'
-    member_01 = '{"id":"10.0.0.1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
-    member_02 = '{"id":"10.0.0.2", "pool_id":"1", "address":"10.0.0.2", "port":"80"}'
+    #member_01 = '{"id":"10.0.0.1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
+    #member_02 = '{"id":"10.0.0.2", "pool_id":"1", "address":"10.0.0.2", "port":"80"}'
     if len(LBVip.objects.all()) <= 0:
         add_vip(vip)
         add_pool(pool)
@@ -46,8 +46,8 @@ def init():
         #add_member(member_02)
         sync_vip()
         sync_pool()
-        sync_member()
-        sync_flow()
+        #sync_member()
+        #sync_flow()
 
 @log
 @check_daemon
@@ -61,7 +61,7 @@ def home(request):
 @log
 @check_daemon
 def ajax_del_member(request):
-    print 'ajax del member'
+    monitor.PAUSE_MONITOR = True
     if 'mid' not in request.POST:
       return HttpResponse('{"status":"-1", "reason":"form has not mid","data":"no"}', mimetype='application/javascript')
     mid = request.POST['mid']
@@ -77,6 +77,9 @@ def ajax_del_member(request):
 
     status_reason_resdata = del_member(mid)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_resdata
+    sync_member()
+    sync_flow()
+    monitor.PAUSE_MONITOR = False
     return HttpResponse(res, mimetype='application/javascript')
     pass
 
@@ -107,6 +110,7 @@ def ajax_add_member(request):
     status_reason_data = add_member(member)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_data
     print 'res:', res
+    sync_member()
     return HttpResponse(res, mimetype='application/javascript')
     pass
 

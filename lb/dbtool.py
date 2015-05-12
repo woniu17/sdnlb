@@ -194,19 +194,9 @@ def get_lb_match(entry):
   return None
 
 def push_flow():
-    flow_count = 0
-    mean_weight = 0
     flow_list = LBFlow.objects.all()
     for flow in flow_list:
-        flow.weight = float(flow.packet_count) / float(flow.duraction)
-        mean_weight += flow.weight
-        flow_count += 1
-    if flow_count > 0:
-        mean_weight /= flow_count
-    else:
-       mean_weight = 1
-    for flow in flow_list:
-        flow.weight /= mean_weight
+        flow.weight = float(flow.packet_count) / 4.0
         flow.save()
 
     global CONTROLLER_HOST
@@ -238,6 +228,8 @@ def sync_flow():
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
     
+    LBFlow.objects.all().delete()
+    LBFlowEntry.objects.all().delete()
     #get flow entry info1
     url = '/wm/staticflowpusher/list/all/json'
     conn = sendhttp(host, url,)
@@ -320,25 +312,43 @@ def sync_flow():
         fe_list.append(fe)
 
     flow_dict = {}
+    mid_dict = {}
     for fe in fe_list:
         fid = fe.get_fid()
         if fid not in flow_dict:
             flow_dict[fid] = LBFlow()
             flow_dict[fid].fid = fid
-        fe.flow = flow_dict[fid]
-        fe.save()
-            
+            #flow_dict[fid].save()
+        flow = flow_dict[fid]
+        fe.flow = flow
+
+        if fid in mid_dict:
+            continue
+        if fe.eid.find('inbound') < 0:
+            continue
+        info1 = eval(fe.info1)
+        if 'instructions' not in info1:
+            continue
+        inst = info1['instructions']
+        if 'instruction_apply_actions' not in inst:
+            continue
+        actions = inst['instruction_apply_actions']
+        if 'ipv4_dst' not in actions:
+            continue
+        mid_dict[fid] = actions['ipv4_dst']
+        #fe.save()
+
     for fid, flow in flow_dict.iteritems():
-        #print 'flow.get_mid():', flow.get_mid()
-        #print 'LBMember.len:', len(LBMember.objects.all())
-        mid = flow.get_mid()
+        mid = mid_dict[fid] 
         try :
             member = LBMember.objects.get(mid=mid)
             flow.member = member
             flow.save()
         except ObjectDoesNotExist:
+            print 'no member', mid
             pass
-
+    for fe in fe_list:
+        fe.save()
     for fid, flow in flow_dict.iteritems():
         break
         #print 'fid:', fid, '; flow:', flow
@@ -517,6 +527,5 @@ def del_flow(flow):
         if int(status) != 200:
             print 'fail to del flow entry %s!!!!' % (entry.eid,) 
     #return status, reason, resdata
-    sync_flow()
     return 'OK'
   

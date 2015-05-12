@@ -5,7 +5,7 @@
         <style type="text/css">
             .host_list, .pool_list, .member_list, .flow_list{margin-left: 20px; margin-top:10px;}
             .host, .member{margin-top: 6px;margin-bottom: 6px;}
-            .host > span{display:inline-block; width:300px;}
+            .host > span{display:inline-block; width:350px;}
             .vip > span{color: red;}
             .pool > span{color: blue;}
             .member > span{color: green;}
@@ -19,9 +19,14 @@
         </style>
         <script type="text/javascript" src="http://code.jquery.com/jquery-1.11.2.min.js"></script>
         <script type="text/javascript">
+          $.ajaxSetup({
+              async: false
+          });
+          var cancle_update = false;
           function bind_event_for_member(){
               // delete member
               $('.member_deletion_button').click(function(){
+                  cancle_update = true;
                   var mid = $(this).parents('.member').attr('mid');
                   $.ajax({
                       type: 'POST',
@@ -41,11 +46,13 @@
               });
               // modify member
               $('.member_modifition_button').click(function(){
+                  cancle_update = true;
                   var mid = $(this).parents('.member').attr('mid');
                   console.log('modify member ' + mid);
               });
               // add member
               $('.member_addition_button').click(function(){
+                  cancle_update = true;
                   var ipv4 = $(this).parents('.host').attr('ipv4');
                   var port = $(this).parents('.host').attr('port');
                   var mid = ipv4;
@@ -81,6 +88,9 @@
 
           }
           function update_member_list(){
+              if(cancle_update){
+                  return;
+              }
               $.ajax({
                   type: 'POST',
                   url: 'ajax_get_member_list',
@@ -93,29 +103,35 @@
                         for (var i=0; i<member_list.length; i++){
                             var m = member_list[i];
                             $('#template .member').attr('mid', m['pk']);
-                            $('#template .member span.member_span').html(m['pk']+':'+m['fields']['port']);
-                            $('#template .member span.req_count').html(m['fields']['req_count']);
-                            $('#template .member span.kb_count').html(m['fields']['kb_count']);
-                            $('#template .member span.cpu_load').html(m['fields']['cpu_load']);
-                            $('#template .member span.uptime').html(m['fields']['uptime']);
-                            $('#template .member span.req_per_sec').html(m['fields']['req_per_sec']);
-                            $('#template .member span.byte_per_sec').html(m['fields']['byte_per_sec']);
-                            $('#template .member span.byte_per_req').html(m['fields']['byte_per_req']);
-                            $('#template .member span.busy_workers').html(m['fields']['busy_workers']);
-                            $('#template .member span.idle_workers').html(m['fields']['idle_workers']);
-                            $('#template .member span.update_time').html(m['fields']['update_time']);
-                            $('#template .member .flow_list .flow').remove();
-                            console.log('str(flow_list):' + m['fields']['flow_list']);
+                            $('#template .member > span.member_span').html(m['pk']+':'+m['fields']['port']);
+                            $('#template .member > span.req_count').html(m['fields']['req_count']);
+                            $('#template .member > span.kb_count').html(m['fields']['kb_count']);
+                            $('#template .member > span.cpu_load').html(m['fields']['cpu_load']);
+                            $('#template .member > span.uptime').html(m['fields']['uptime']);
+                            $('#template .member > span.req_per_sec').html(m['fields']['req_per_sec']);
+                            $('#template .member > span.byte_per_sec').html(m['fields']['byte_per_sec']);
+                            $('#template .member > span.byte_per_req').html(m['fields']['byte_per_req']);
+                            $('#template .member > span.busy_workers').html(m['fields']['busy_workers']);
+                            $('#template .member > span.idle_workers').html(m['fields']['idle_workers']);
+                            $('#template .member > span.update_time').html(m['fields']['update_time']);
+                            $('#template .member > .flow_list .flow').remove();
+                            //console.log('str(flow_list):' + m['fields']['flow_list']);
                             var flow_list = $.parseJSON(m['fields']['flow_list'])
-                            console.log('flow_list:' + flow_list);
+                            //console.log('flow_list:' + flow_list);
+                            var weight = 0.0
                             for (var j=0; j<flow_list.length; j++){
                                 var f = flow_list[j];
-                                $('#template > .flow span.flow_id').html(f['fid']);
-                                $('#template > .flow span.flow_count').html(f['packet_count']/4);
-                                $('#template > .flow span.packet_count').html(f['packet_count']);
-                                $('#template > .flow span.duraction').html(f['duraction']);
-                                $('#template .member .flow_list').append($('#template > .flow').clone());
+                                var w = f['packet_count']/(4.0);
+                                weight += w;
+                                $('#template > .flow > span.number').html((j+1));
+                                $('#template > .flow > span.flow_id').html(f['fid']);
+                                $('#template > .flow > span.flow_count').html(f['packet_count']/4.0);
+                                $('#template > .flow > span.packet_count').html(f['packet_count']);
+                                $('#template > .flow > span.duraction').html(f['duraction']);
+                                $('#template > .flow > span.weight').html(w.toFixed(8));
+                                $('#template > .member > .flow_list').append($('#template > .flow').clone());
                             }
+                            $('#template > .member > span.weight').html(weight.toFixed(8));
                             //console.log('member:'+$('#member_template').prop('outerHTML'));
                             //$('.member_list').append($('#member_template').prop('outerHTML'));
                             $('.member_list').append($('#template .member').clone());
@@ -158,21 +174,26 @@
     <span class="byte_per_req w80"></span>
     <span class="busy_workers w90"></span>
     <span class="idle_workers w90"></span>
+    <span class="weight w110">1.0</span>
     <span class="update_time w80"></span>
     <span class="w80"><input type="button" value="删除" class="member_deletion_button"/></span>
     <span class="w80"><input type="button" value="修改" class="member_modifition_button hidden"/></span>
     <div class="flow_list">
+        <span class="w80">流水号</span>
         <span class="w190">Flow ID</span>
         <span class="w80">FlowCount</span>
         <span class="w80">PacketCount</span>
         <span class="w80">Duraction</span>
+        <span class="w80">Weight(FC/D)</span>
     </div>
   </div>
   <div class="flow">
+    <span class="number w80"></span>
     <span class="flow_id w190"></span>
     <span class="flow_count w80"></span>
     <span class="packet_count w80"></span>
     <span class="duraction w80"></span>
+    <span class="weight w80"></span>
   </div>
 </div>
 
@@ -209,6 +230,7 @@
                                 <span class="w80">BytePerReq</span>
                                 <span class="w90">BusyWorkers</span>
                                 <span class="w90">IdleWorkers</span>
+                                <span class="w110">Weight(FC/D)</span>
                                 <span class="w80">更新时间</span>
                                 <span class="w80"><input type="button" value="详情" class="member_detail_button"/></span>
                             {% for member in pool.lbmember_set.all %}

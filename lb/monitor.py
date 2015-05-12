@@ -5,9 +5,10 @@ import commands
 import threading, time
 import httplib, urllib
 from models import *
-import dbtool
+from dbtool import *
 
 MONITOR_DAEMON = None
+PAUSE_MONITOR = False
 
 def update_server_status(member, server_status):
     #print server_status
@@ -51,7 +52,10 @@ def update_server_status(member, server_status):
     pass
 
 def member_monitor():
-    dbtool.sync_flow()
+    global PAUSE_MONITOR
+    if PAUSE_MONITOR:
+        return
+    sync_flow()
     member_list = LBMember.objects.all()
     for member in member_list:
         #TODO about synchronization

@@ -2,20 +2,32 @@
 import json
 import httplib, urllib
 from models import *
+from tool import *
 from django.core.exceptions import ObjectDoesNotExist
 CONTROLLER_HOST = '127.0.0.1:8080'
 
+host_dict = {}
+vip_dict = {}
+pool_dict = {}
+member_dict = {}
+entry_dict = {}
+flow_dict = {}
+
+#@log
 def sendhttp(host, url='/', data=None, method='GET', headers=None):
     if method == 'PUT' or method == 'POST':
         #headers = { 'Content-type':'application/javascript', 'Accept':'text/plain', }
         pass
     conn = httplib.HTTPConnection(host)
-    print 'method:', method, 'host:', host, 'url:',url, 'data:', data
+    #print 'method:', method, 'host:', host, 'url:',url, 'data:', data
     #conn.request(method, url, data, headers)
     conn.request(method, url, data,)
     return conn
 
+@log
 def sync_host():
+    global host_dict
+    #pull hosts from server
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
     url = '/wm/device/'
@@ -28,9 +40,16 @@ def sync_host():
     print 'status: %s, reason: %s' % (status, reason)
     if int(status) != 200:
         return
+    #unfresh all hosts
+    for hid, host in host_dict.iteritems():
+        host.fresh = False
+        '''
+    print 'after unfresh all hosts'
+    for hid, host in host_dict.iteritems():
+        print '%s; fresh:%s' % (host_dict[hid], host_dict[hid].fresh)
+        '''
+    #fresh hosts
     host_list = json.loads(resdata)
-
-    Host.objects.all().delete()
     for host in host_list:
         if not ('ipv4' in host):
             continue
@@ -44,13 +63,38 @@ def sync_host():
           continue
         ipv4 = ipv4_list[0]
         mac = mac_list[0]
-        print 'ipv4 = %s, mac = %s' % (ipv4, mac)
-        host = Host()
+        #print 'ipv4 = %s, mac = %s' % (ipv4, mac)
+        hid = ipv4
+        if hid not in host_dict:
+            host_dict[hid] = Host()
+            host_dict[hid].hid = hid
+        host = host_dict[hid]
         host.ipv4 = ipv4
         host.mac = mac
-        host.save()
+        host.fresh = True
+        '''
+        #This is for test
+        if host.ipv4 == '10.0.0.100':
+            host.fresh = False
+        '''
+    '''
+    print 'after fresh all hosts'
+    for hid, host in host_dict.iteritems():
+        print '%s; fresh:%s' % (host_dict[hid], host_dict[hid].fresh)
+        '''
+    #delete unfresh hosts
+    for hid, host in host_dict.items():
+        if not host_dict[hid].fresh:
+            del host_dict[hid]
+        '''
+    print 'after delete unfresh hosts'
+    for hid, host in host_dict.iteritems():
+        print '%s; fresh:%s' % (host_dict[hid], host_dict[hid].fresh)
+        '''
 
+@log
 def sync_vip():
+    global vip_dict
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
     url = '/quantum/v1.0/vips/'
@@ -66,32 +110,44 @@ def sync_vip():
     vip_list = json.loads(resdata)
 
     #set all LBVip unfresh
-    v_list = LBVip.objects.all()
-    for v in v_list:
-        v.fresh = False
-        v.save() #must save, because the filter(fresh=False) will retrive from db
-
+    for vid, vip in vip_dict.iteritems():
+        vip.fresh = False
+        '''
+    print 'after unfresh all vips'
+    for vid, vip in vip_dict.iteritems():
+        print '%s; fresh:%s' % (vip_dict[vid], vip_dict[vid].fresh)
+        '''
     #refresh LBVip
     for vip in vip_list:
-        v = None
-        try :
-            v = LBVip.objects.get(vid=vip['id'])
-        except ObjectDoesNotExist:
-            print 'vip' ,vip['id'], 'does not exist'
-            v = LBVip()
-            v.vid = vip['id']
+        vid = vip['id']
+        if vid not in vip_dict:
+            vip_dict[vid] = LBVip()
+            vip_dict[vid].vid = vid
+        v = vip_dict[vid]
         v.name = vip['name']
         v.protocol = vip['protocol']
         v.address = vip['address']
         v.port = vip['port']
         v.fresh = True
-        v.save()
-        print v
-
+        '''
+    print 'after fresh all vips'
+    for vid, vip in vip_dict.iteritems():
+        print '%s; fresh:%s' % (vip_dict[vid], vip_dict[vid].fresh)
+        '''
     #delete unfreshed LBVip
-    v_list.filter(fresh=False).delete()
+    for vid, vip in vip_dict.items():
+        if not vip_dict[vid].fresh:
+            del vip_dict[vid]
+        '''
+    print 'after delete unfresh vips'
+    for vid, vip in vip_dict.iteritems():
+        print '%s; fresh:%s' % (vip_dict[vid], vip_dict[vid].fresh)
+        '''
 
+@log
 def sync_pool():
+    global vip_dict
+    global pool_dict
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
     url = '/quantum/v1.0/pools/'
@@ -107,31 +163,45 @@ def sync_pool():
     pool_list = json.loads(resdata)
 
     #set all LBPool unfresh
-    p_list = LBPool.objects.all()
-    for p in p_list:
-        p.fresh = False
-        p.save() #must save, because the filter(fresh=False) will retrive from db
-
+    for pid, pool in pool_dict.iteritems():
+        pool.fresh = False
+        '''
+    print 'after unfresh all pools'
+    for pid, pool in pool_dict.iteritems():
+        print '%s; fresh:%s' % (pool_dict[pid], pool_dict[pid].fresh)
+        '''
     #refresh LBPool
     for pool in pool_list:
-        p = None
-        try :
-            p = LBPool.objects.get(pid=pool['id'])
-        except ObjectDoesNotExist:
-            print 'pool' ,pool['id'], 'does not exist'
-            p = LBPool()
-            p.pid = pool['id']
+        pid = pool['id']
+        if pid not in pool_dict:
+            pool_dict[pid] = LBPool()
+            pool_dict[pid].pid = pid
+        p = pool_dict[pid]
         p.name = pool['name']
         #p.protocol = pool['protocol']
-        p.vip = LBVip.objects.get(vid=int(pool['vipId']))
+        vid = pool['vipId']
+        #p.vip = vip_dict[vid]
+        p.vip = vid
         p.fresh = True
-        p.save()
-        print p
-
+        '''
+    print 'after fresh all pools'
+    for pid, pool in pool_dict.iteritems():
+        print '%s; fresh:%s' % (pool_dict[pid], pool_dict[pid].fresh)
+        '''
     #delete unfreshed LBPool
-    p_list.filter(fresh=False).delete()
+    for pid, pool in pool_dict.items():
+        if not pool.fresh:
+            del pool_dict[pid]
+            '''
+    print 'after unfresh all pools'
+    for pid, pool in pool_dict.iteritems():
+        print '%s; fresh:%s' % (pool_dict[pid], pool_dict[pid].fresh)
+        '''
 
+@log
 def sync_member():
+    global pool_dict
+    global member_dict
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
     url = '/quantum/v1.0/members/'
@@ -149,32 +219,68 @@ def sync_member():
     print 'member_list.length:' , len(member_list)
 
     #set all LBMember unfresh
-    m_list = LBMember.objects.all()
-    for m in m_list:
-        m.fresh = False
-        m.save() #must save, because the filter(fresh=False) will retrive from db
-
+    for mid, member in member_dict.iteritems():
+        member.fresh = False
+        '''
+    print 'after unfresh all members'
+    for mid, member in member_dict.iteritems():
+        print '%s; fresh:%s' % (member_dict[mid], member_dict[mid].fresh)
+        '''
     #refresh LBMember
     for member in member_list:
-        m = None
-        try :
-            m = LBMember.objects.get(mid=member['id'])
-        except ObjectDoesNotExist:
-            print 'member' ,member['id'], 'does not exist'
-            m = LBMember()
-            m.mid = member['id']
-
+        mid = member['id']
+        if mid not in member_dict:
+            member_dict[mid] = LBMember()
+            member_dict[mid].mid = mid
+        m = member_dict[mid]
         m.address = member['address']
         m.port = member['port']
-        m.pool = LBPool.objects.get(pid=int(member['poolId']))
+        #m.pool = pool_dict[member['poolId']]
+        m.pool = member['poolId']
         m.fresh = True
-        m.save()
-        print m
+        '''
+    print 'after fresh all members'
+    for mid, member in member_dict.iteritems():
+        print '%s; fresh:%s' % (member_dict[mid], member_dict[mid].fresh)
+        '''
     #delete unfreshed LBMember
-    #print 'm_list.length:', len(m_list)
-    #print 'm_list.fresh(False).length:', len(m_list.filter(fresh=False))
-    m_list.filter(fresh=False).delete()
+    for mid, member in member_dict.items():
+        if not member.fresh:
+            del member_dict[mid]
+            '''
+    print 'after delete unfresh members'
+    for mid, member in member_dict.iteritems():
+        print '%s; fresh:%s' % (member_dict[mid], member_dict[mid].fresh)
+        '''
 
+@log
+def push_flow():
+    global flow_dict
+
+    global CONTROLLER_HOST
+    host = CONTROLLER_HOST
+    url = '/quantum/v1.0/lbflow/'
+    data = '{'
+    first = True
+    for fid, flow in flow_dict.iteritems():
+        if not first:
+            data += ','
+        data += '"network_id":"%s", "weight":"%s", "member":"%s"' % (flow.get_network_id(), flow.weight, flow.member)
+        first = False
+    data += '}'
+    #print data
+    #data = '{"network_id":"123", "weight":"123.123", "member":"10.0.0.1", "network_id":"234", "weight":"1.23", "member":"10.0.0.1"}'
+        
+    method = 'PUT'
+    conn = sendhttp(host, url, data, method)
+    httpres = conn.getresponse()
+    status = httpres.status
+    reason = httpres.reason
+    resdata = httpres.read()
+    conn.close()
+    #print 'status: %s, reason: %s' % (status, reason)
+    if int(status) != 200:
+        pass
 
 def get_lb_match(entry):
 
@@ -193,44 +299,10 @@ def get_lb_match(entry):
      
   return None
 
-def push_flow():
-    flow_list = LBFlow.objects.all()
-    for flow in flow_list:
-        flow.weight = float(flow.packet_count) / 4.0
-        flow.save()
-
-    global CONTROLLER_HOST
-    host = CONTROLLER_HOST
-    url = '/quantum/v1.0/lbflow/'
-    data = '{'
-    first = True
-    for flow in LBFlow.objects.all():
-        if not first:
-            data += ','
-        data += '"network_id":"%s", "weight":"%s", "member":"%s"' % (flow.get_network_id(), flow.weight, flow.member.mid)
-        first = False
-    data += '}'
-    #print data
-    #data = '{"network_id":"123", "weight":"123.123", "member":"10.0.0.1", "network_id":"234", "weight":"1.23", "member":"10.0.0.1"}'
-        
-    method = 'PUT'
-    conn = sendhttp(host, url, data, method)
-    httpres = conn.getresponse()
-    status = httpres.status
-    reason = httpres.reason
-    resdata = httpres.read()
-    conn.close()
-    #print 'status: %s, reason: %s' % (status, reason)
-    if int(status) != 200:
-        pass
-
-def sync_flow():
-    global CONTROLLER_HOST
-    host = CONTROLLER_HOST
-    
-    LBFlow.objects.all().delete()
-    LBFlowEntry.objects.all().delete()
+def get_info1():
     #get flow entry info1
+    global CONTROLLER_HOST
+    host = CONTROLLER_HOST
     url = '/wm/staticflowpusher/list/all/json'
     conn = sendhttp(host, url,)
     httpres = conn.getresponse()
@@ -241,7 +313,7 @@ def sync_flow():
     #print 'status: %s, reason: %s' % (status, reason)
     if int(status) != 200:
         print 'sync flow fail!!'
-        return
+        return None
     #print 'resdata:', resdata
     flow_entry_dict = json.loads(resdata)
     #print 'flow_entry_dict.length:' , len(flow_entry_dict)
@@ -259,7 +331,13 @@ def sync_flow():
                 #print fe.eid, ':' , type(fe.info1), ':', fe.info1
 
     #print 'len(info1_dict):', len(info1_dict)
+    return info1_dict
+    pass
+
+def get_info2():
     #get flow entry info2
+    global CONTROLLER_HOST
+    host = CONTROLLER_HOST
     url = '/wm/core/switch/all/flow/json'
     conn = sendhttp(host, url,)
     httpres = conn.getresponse()
@@ -270,7 +348,7 @@ def sync_flow():
     #print 'status: %s, reason: %s' % (status, reason)
     if int(status) != 200:
         print 'sync flow fail!!'
-        return
+        return None
     #print 'resdata:', resdata
     flow_entry_dict = json.loads(resdata)
     #print 'flow_entry_dict.length:' , len(flow_entry_dict)
@@ -296,101 +374,91 @@ def sync_flow():
             #print 'key:' + key
             pass
     #print 'len(info2_dict):', len(info2_dict)
+    return info2_dict
+    pass
 
 
+@log
+def sync_flow():
+    global member_dict
+    global flow_dict
+    global entry_dict
+    
     #get flow entry
-    fe_list = []
+    entry_dict = {}
+    info1_dict = get_info1()
+    info2_dict = get_info2()
     for eid, info1 in info1_dict.iteritems():
-        fe = LBFlowEntry()
-        fe.eid = str(eid)
-        fe.info1 = str(info1)
-        pinswmatch = fe.pinswmatch
+        entry = LBFlowEntry()
+        entry.eid = str(eid)
+        entry.info1 = str(info1)
+        pinswmatch = entry.pinswmatch
         #print 'pinswmatch:', pinswmatch
-        fe.info2 = str(info2_dict[pinswmatch])
-        #print 'fe.packet_count:', fe.packet_count
-        #print 'fe.fid:', fe.fid
-        fe_list.append(fe)
+        entry.info2 = str(info2_dict[pinswmatch])
+        #print 'entry.packet_count:', entry.packet_count
+        #print 'entry.fid:', entry.fid
+        entry_dict[eid] = entry
 
-    flow_dict = {}
-    mid_dict = {}
-    for fe in fe_list:
-        fid = fe.get_fid()
+    #set flow
+    for eid, entry in entry_dict.iteritems():
+        fid = entry.get_fid()
         if fid not in flow_dict:
             flow_dict[fid] = LBFlow()
             flow_dict[fid].fid = fid
-            #flow_dict[fid].save()
         flow = flow_dict[fid]
-        fe.flow = flow
+        #entry.flow = flow
+        entry.flow = fid
+        #print entry
 
-        if fid in mid_dict:
-            continue
-        if fe.eid.find('inbound') < 0:
-            continue
-        info1 = eval(fe.info1)
-        if 'instructions' not in info1:
-            continue
-        inst = info1['instructions']
-        if 'instruction_apply_actions' not in inst:
-            continue
-        actions = inst['instruction_apply_actions']
-        if 'ipv4_dst' not in actions:
-            continue
-        mid_dict[fid] = actions['ipv4_dst']
-        #fe.save()
+    #set flow inbound/outbound
+    for fid, flow in flow_dict.iteritems():
+        flow.inbound_entry_list = []
+        flow.outbound_entry_list = []
+    for eid, entry in entry_dict.iteritems():
+        flow = flow_dict[entry.flow]
+        if entry.eid.find('inbound') >= 0:
+            flow.inbound_entry_list.append(entry)
+        elif entry.eid.find('outbound') >= 0:
+            flow.outbound_entry_list.append(entry)
+        else :
+            print 'ERROR in sync_flow, entry should be inbound or outbound!!!!!'
+    #set member of flow
+    for mid, member in member_dict.iteritems():
+        member.flow_list = []
+    for fid, flow in flow_dict.iteritems():
+        mid = flow.get_mid()
+        flow.member = mid
+        member = member_dict[mid]
+        member.flow_list.append(flow)
+    #set old_req_count, old_duraction
+    for fid, flow in flow_dict.iteritems():
+         flow.old_req_count = flow.req_count
+         flow.old_duraction = flow.duraction
+    #set req_count, duraction
+    for fid, flow in flow_dict.iteritems():
+         flow.req_count = float(flow.outbound_entry_list[-1].packet_count) / 4.0
+         flow.duraction = float(flow.outbound_entry_list[-1].duraction)
+    for fid, flow in flow_dict.iteritems():
+         d = flow.duraction - flow.old_duraction 
+         r = flow.req_count - flow.old_req_count
+         g = 0.3
+         if d == 0 :
+             print 'ERROR in sync_flow, d==0!!!!!'
+             flow.weight = 1
+         else :
+             flow.weight = g * (r / d) + (1-g) * flow.weight
+             flow.weight = (r / d) + 1
+    for mid, member in member_dict.iteritems():
+        member.weight = 0
+    #set weight of flow
+    for fid, flow in flow_dict.iteritems():
+        member = member_dict[flow.member]
+        member.weight += flow.weight
 
-    for fid, flow in flow_dict.iteritems():
-        mid = mid_dict[fid] 
-        try :
-            member = LBMember.objects.get(mid=mid)
-            flow.member = member
-            flow.save()
-        except ObjectDoesNotExist:
-            print 'no member', mid
-            pass
-    for fe in fe_list:
-        fe.save()
-    for fid, flow in flow_dict.iteritems():
-        break
-        #print 'fid:', fid, '; flow:', flow
-        inbound_entry_list = flow.inbound_entry_list
-        for entry in inbound_entry_list:
-           print 'inbound entry:', entry
-        outbound_entry_list = flow.outbound_entry_list
-        for entry in outbound_entry_list:
-           print 'outbound entry:', entry
+    #push flow into server
     push_flow()
-
         
-
-    '''
-    #set all LBMember unfresh
-    m_list = LBMember.objects.all()
-    for m in m_list:
-        m.fresh = False
-        m.save() #must save, because the filter(fresh=False) will retrive from db
-
-    #refresh Flow
-    for member in member_list:
-        m = None
-        try :
-            m = LBMember.objects.get(mid=member['id'])
-        except ObjectDoesNotExist:
-            print 'member' ,member['id'], 'does not exist'
-            m = LBMember()
-            m.mid = member['id']
-
-        m.address = member['address']
-        m.port = member['port']
-        m.pool = LBPool.objects.get(pid=int(member['poolId']))
-        m.fresh = True
-        m.save()
-        print m
-    #delete unfreshed LBMember
-    #print 'm_list.length:', len(m_list)
-    #print 'm_list.fresh(False).length:', len(m_list.filter(fresh=False))
-    m_list.filter(fresh=False).delete()
-    '''
-
+@log
 def add_vip(vip):
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
@@ -409,6 +477,7 @@ def add_vip(vip):
         print 'add vip: %s' % (vip_,) 
     return status, reason, resdata
 
+@log
 def add_pool(pool):
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
@@ -427,6 +496,7 @@ def add_pool(pool):
         print 'add pool: %s' % (pool_,) 
     return status, reason, resdata
     
+@log
 def add_member(member):
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
@@ -445,14 +515,17 @@ def add_member(member):
         print 'add member: %s' % (member_,) 
     return status, reason, resdata
 
+@log
 def del_vip(vip):
     print 'to be implememt'
     pass
 
+@log
 def del_pool(pool):
     print 'to be implememt'
     pass
   
+@log
 def del_member(mid):
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
@@ -472,6 +545,7 @@ def del_member(mid):
         print 'del member: %s' % (member,) 
     return status, reason, resdata
 
+@log
 def upd_vip(vip):
     status, reason, resdata = add_vip(vip)
     if int(status) == 200:
@@ -479,6 +553,7 @@ def upd_vip(vip):
         print 'update vip: %s [last add-operation is actually update-operation]' % (vip_,) 
     return status, reason, resdata
 
+@log
 def upd_vip(pool):
     status, reason, resdata = add_pool(pool)
     if int(status) == 200:
@@ -486,6 +561,7 @@ def upd_vip(pool):
         print 'update pool: %s [last add-operation is actually update-operation]' % (pool_,) 
     return status, reason, resdata
 
+@log
 def upd_member(member):
     status, reason, resdata = add_member(member)
     if int(status) == 200:
@@ -493,6 +569,7 @@ def upd_member(member):
         print 'update member: %s [last add-operation is actually update-operation]' % (member_,) 
     return status, reason, resdata
 
+@log
 def check_member(member_):
     #member_01 = '{"id":"1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
     valid = True
@@ -506,16 +583,19 @@ def check_member(member_):
         valid = False
     return valid
 
+@log
 def del_flow(flow):
+    global entry_dict
     global CONTROLLER_HOST
     host = CONTROLLER_HOST
     url = '/wm/staticflowpusher/json'
     #print 'url:', url
     data = {}
     method = 'DELETE'
-    entry_list = flow.lbflowentry_set.all()
-    for entry in entry_list:
-        print 'entry', entry.eid
+    for eid, entry in entry_dict.items():
+        if entry.flow != flow.fid:
+            continue
+        print 'delete', entry
         data = '{"name":"%s"}' % (entry.eid)
         conn = sendhttp(host, url, data, method,)
         httpres = conn.getresponse()
@@ -524,8 +604,28 @@ def del_flow(flow):
         resdata = httpres.read()
         conn.close()
         print 'status: %s, reason: %s' % (status, reason)
+        del entry_dict[eid]
         if int(status) != 200:
             print 'fail to del flow entry %s!!!!' % (entry.eid,) 
     #return status, reason, resdata
     return 'OK'
   
+def get_to_delete_flow_list():
+     global flow_dict
+     global member_dict
+     to_delete_flow_list = []
+     avg_weight = 0.0
+     for mid, member in member_dict.iteritems():
+         avg_weight += member.weight
+     avg_weight /= len(member_dict)
+     for fid, flow in flow_dict.iteritems():
+         member = member_dict[flow.member]
+         if member.weight <= avg_weight:
+             continue
+         d1 = member.weight - avg_weight
+         d2 = avg_weight - (member.weight - flow.weight)
+         if d2 >= d1 :
+           continue
+         member.weight -= flow.weight
+         to_delete_flow_list.append(flow)
+     return to_delete_flow_list

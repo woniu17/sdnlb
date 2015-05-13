@@ -3,13 +3,18 @@
 		<title>Load Balancer APP!</title>
 		<meta http-equiv=Content-Type content="text/html;charset=utf-8">
         <style type="text/css">
-            .host_list, .pool_list, .member_list, .flow_list{margin-left: 20px; margin-top:10px;}
-            .host, .member{margin-top: 6px;margin-bottom: 6px;}
+            body{margin-left:100px; margin-right:80px;}
+            .host_list, .pool_list, .member_list, .member_list_title, .flow_list, .flow_list_title, .action_list{margin-left: 20px; margin-top:5px;}
+            .flow_list{height:120px; overflow-y:scroll;}
+            .action_list{height:120px; overflow-y:scroll;}
+            .host, .member{margin-top: 3px;margin-bottom: 3px;}
             .host > span{display:inline-block; width:350px;}
             .vip > span{color: red;}
             .pool > span{color: blue;}
             .member > span{color: green;}
             .flow > span{color: purple;}
+            .event > span{color: purple;}
+            .action{color: green;display: block;}
             .member_list > span{color: black; display:inline-block; width:80px;}
             span.w190{display:inline-block; width:190px;}
             span.w110{display:inline-block; width:110px;}
@@ -97,8 +102,11 @@
                   data: 'none=none',
                   dataType: 'text',
                   success: function(data) {
-                        var member_list = $.parseJSON(data);
-                        //console.log('member_list:'+data);
+                        var resdata = $.parseJSON(data);
+                        //var member_list = $.parseJSON(data);
+                        var member_list = resdata['member_list'];
+                        var flow_list = resdata['flow_list'];
+                        console.log('data:'+data);
                         $('.member_list .member').remove();
                         for (var i=0; i<member_list.length; i++){
                             var m = member_list[i];
@@ -115,19 +123,23 @@
                             $('#template .member > span.idle_workers').html(m['fields']['idle_workers']);
                             $('#template .member > span.update_time').html(m['fields']['update_time']);
                             $('#template .member > .flow_list .flow').remove();
-                            //console.log('str(flow_list):' + m['fields']['flow_list']);
-                            var flow_list = $.parseJSON(m['fields']['flow_list'])
                             //console.log('flow_list:' + flow_list);
                             var weight = 0.0
+                            var num = 0
                             for (var j=0; j<flow_list.length; j++){
                                 var f = flow_list[j];
-                                var w = f['packet_count']/(4.0);
+                                if (f['fields']['member'] != m['pk']){
+                                    continue;
+                                }
+                                num++;
+                                var w = f['fields']['weight'];
                                 weight += w;
-                                $('#template > .flow > span.number').html((j+1));
-                                $('#template > .flow > span.flow_id').html(f['fid']);
-                                $('#template > .flow > span.flow_count').html(f['packet_count']/4.0);
-                                $('#template > .flow > span.packet_count').html(f['packet_count']);
-                                $('#template > .flow > span.duraction').html(f['duraction']);
+                                $('#template > .flow > span.number').html(num);
+                                $('#template > .flow > span.flow_id').html(f['pk']);
+                                $('#template > .flow > span.old_req_count').html(f['fields']['old_req_count']);
+                                $('#template > .flow > span.old_duraction').html(f['fields']['old_duraction']);
+                                $('#template > .flow > span.req_count').html(f['fields']['req_count']);
+                                $('#template > .flow > span.duraction').html(f['fields']['duraction']);
                                 $('#template > .flow > span.weight').html(w.toFixed(8));
                                 $('#template > .member > .flow_list').append($('#template > .flow').clone());
                             }
@@ -178,21 +190,25 @@
     <span class="update_time w80"></span>
     <span class="w80"><input type="button" value="删除" class="member_deletion_button"/></span>
     <span class="w80"><input type="button" value="修改" class="member_modifition_button hidden"/></span>
-    <div class="flow_list">
+    <div class="flow_list_title">
         <span class="w80">流水号</span>
         <span class="w190">Flow ID</span>
-        <span class="w80">FlowCount</span>
-        <span class="w80">PacketCount</span>
-        <span class="w80">Duraction</span>
+        <span class="w90">OldReqCount</span>
+        <span class="w90">OldDuraction</span>
+        <span class="w90">ReqCount</span>
+        <span class="w90">Duraction</span>
         <span class="w80">Weight(FC/D)</span>
+    </div>
+    <div class="flow_list">
     </div>
   </div>
   <div class="flow">
     <span class="number w80"></span>
     <span class="flow_id w190"></span>
-    <span class="flow_count w80"></span>
-    <span class="packet_count w80"></span>
-    <span class="duraction w80"></span>
+    <span class="old_req_count w90"></span>
+    <span class="old_duraction w90"></span>
+    <span class="req_count w90"></span>
+    <span class="duraction w90"></span>
     <span class="weight w80"></span>
   </div>
 </div>
@@ -216,10 +232,10 @@
                 <span>{{vip}}</span>
                 &nbsp;&nbsp;<input type="button" value="修改" class="vip_modifition_button"/>
                 <div class="pool_list">
-                {% for pool in vip.lbpool_set.all %}
+                {% for pool in pool_list %}
                 <div class="pool" pid="{{pool.pid}}">
                         <span>{{pool}}</span>
-                        <div class="member_list">
+                        <div class="member_list_title">
                                 <span class="w110">LB Member</span>
                                 <span class="w80">请求数</span>
                                 <span class="w80">字节数(KB)</span>
@@ -233,6 +249,8 @@
                                 <span class="w110">Weight(FC/D)</span>
                                 <span class="w80">更新时间</span>
                                 <span class="w80"><input type="button" value="详情" class="member_detail_button"/></span>
+                        </div>
+                        <div class="member_list">
                             {% for member in pool.lbmember_set.all %}
                             {% endfor %}
                             <!--
@@ -259,5 +277,20 @@
             </div>
         {% endfor %}
         </div>
+        <div>
+          <h2>Event Log</h2>
+        </div>
+        <div class="event_list">
+        {% for log in log_list %}
+             <div class="event">
+               <span>{{log.time}}:&nbsp;&nbsp;{{log.event}}</span>
+               <div class="action_list">
+               {% for a in log.actions %}
+               <span class="action">{{a}}</span>
+               {% endfor %}
+               </div>
+             </div>
+        {% endfor %}
+        <div>
 	</body>
 </html>

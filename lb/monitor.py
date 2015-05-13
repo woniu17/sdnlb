@@ -12,7 +12,7 @@ PAUSE_MONITOR = False
 
 def update_server_status(member, server_status):
     #print server_status
-    print member.naddress
+    #print member.naddress
     now = time.strftime('%H:%M:%S')
     member.update_time = now
     line_list = server_status.split('\n');
@@ -47,17 +47,20 @@ def update_server_status(member, server_status):
     #print para_list[i]
     member.idle_workers = int(para_list[i])
     i = i+1
-
-    member.save()
     pass
 
+'''
+sync member, flow
+so when add/del/update member or flow, pause it
+'''
 def member_monitor():
+    global member_dict
     global PAUSE_MONITOR
     if PAUSE_MONITOR:
+        print 'PAUSE MONITOR!!!!!!!!!!!!!'
         return
     sync_flow()
-    member_list = LBMember.objects.all()
-    for member in member_list:
+    for mid, member in member_dict.iteritems():
         #TODO about synchronization
         host = member.naddress
         url = '/server-status?auto'

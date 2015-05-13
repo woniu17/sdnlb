@@ -5,8 +5,9 @@ from django.shortcuts import render_to_response, render
 from models import *
 from dbtool import *
 import json
-import functools
 import monitor
+from tool import *
+import time
 
 def check_daemon(f):
     @functools.wraps(f)
@@ -21,62 +22,68 @@ def check_daemon(f):
         monitor.monitor_daemon(right_now = False)
         return f(*args, **argskw)
     return fn
-def log(f):
-    @functools.wraps(f)
-    def fn(*args, **argskw):
-        print 'call lb.%s' % (f.__name__, )
-        return f(*args, **argskw)
-    return fn
 
 @log
 def init():
+    global host_dict
+    global vip_dict
+    global pool_dict
     sync_host()
     sync_vip()
     sync_pool()
-    #sync_member()
-    #sync_flow()
+    sync_member()
     vip = '{"id":"1", "name":"vip-01", "protocol":"icmp", "address":"10.0.0.200", "port":"80"}'
     pool = '{"id":"1", "name":"pool-01", "protocol":"icmp", "vip_id":"1"}'
     #member_01 = '{"id":"10.0.0.1", "pool_id":"1", "address":"10.0.0.1", "port":"80"}'
     #member_02 = '{"id":"10.0.0.2", "pool_id":"1", "address":"10.0.0.2", "port":"80"}'
-    if len(LBVip.objects.all()) <= 0:
+    if len(vip_dict) <= 0:
         add_vip(vip)
         add_pool(pool)
         #add_member(member_01)
         #add_member(member_02)
         sync_vip()
         sync_pool()
-        #sync_member()
+        sync_member()
         #sync_flow()
 
 @log
 @check_daemon
 def home(request):
-
     init()
-    host_list = Host.objects.all()
-    vip_list = LBVip.objects.all()
-    return render(request, 'lb/index.html', {'host_list':host_list, 'vip_list':vip_list})
+    global host_dict
+    global vip_dict
+    global pool_dict
+    global log_list
+    return render(request, 'lb/index.html', {'host_list':host_dict.values(), 'vip_list':vip_dict.values(), 'pool_list':pool_dict.values(), 'log_list':log_list})
 
 @log
 @check_daemon
 def ajax_del_member(request):
+    global member_dict
+    global flow_dict
     monitor.PAUSE_MONITOR = True
     if 'mid' not in request.POST:
       return HttpResponse('{"status":"-1", "reason":"form has not mid","data":"no"}', mimetype='application/javascript')
     mid = request.POST['mid']
-    print 'member:', mid
-    try :
-        member = LBMember.objects.get(mid=mid)
-        for flow in member.lbflow_set.all():
-            print 'flow', flow.fid
-            del_flow(flow)
-    except ObjectDoesNotExist:
-        print 'Error!! There is no member %s to delete!' % (mid,)
-        pass
+    member = member_dict[mid]
+    #log event
+    event = 'del member %s:%s' % (member.mid, member.port)
+    actions = []
+    for fid, flow in flow_dict.items():
+        if flow.member != mid:
+            continue
+        #print 'flow', flow.fid
+        del_flow(flow)
+        del flow_dict[fid]
+        action = 'del %s' % (flow,)
+        actions.append(action)
 
     status_reason_resdata = del_member(mid)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_resdata
+    actions.append(event)
+    global log_list
+    log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
+    log_list.append(log)
     sync_member()
     sync_flow()
     monitor.PAUSE_MONITOR = False
@@ -96,6 +103,8 @@ def ajax_del_vip(request):
 @log
 @check_daemon
 def ajax_add_member(request):
+    global member_dict
+    global flow_dict
     if 'member' not in request.POST:
         res = '{"status":"-1", "reason":"form has not member","data":"no"}'
         print 'res:', res
@@ -107,10 +116,39 @@ def ajax_add_member(request):
         res = '{"status":"-1", "reason":"member info not complete: %s","data":"no"}' % (member,)
         print 'res:', res
         return HttpResponse(res, mimetype='application/javascript')
+    mid = member_['id']
+    if mid in member_dict:
+        res = '{"status":"-1", "reason":"member %s has exsit","data":"no"}' % (member,)
+        print 'res:', res
+        return HttpResponse(res, mimetype='application/javascript')
+    monitor.PAUSE_MONITOR = True
+    member_dict[mid] = LBMember()
+    member_dict[mid].mid = mid
+        
     status_reason_data = add_member(member)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_data
     print 'res:', res
     sync_member()
+    #log event
+    event = 'add member %s:%s' % (member_['id'], member_['port'])
+    actions = []
+    actions.append(event)
+    #delete some flow
+    for mid, member in member_dict.iteritems():
+        print member, member.weight
+    to_delete_flow_list = get_to_delete_flow_list()
+    for flow in to_delete_flow_list:
+        print flow, flow.member
+        del_flow(flow)
+        action = 'del %s' % (flow,)
+        print 'action:', action
+        actions.append(action)
+        del flow_dict[flow.fid]
+
+    global log_list
+    log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
+    log_list.append(log)
+    monitor.PAUSE_MONITOR = False
     return HttpResponse(res, mimetype='application/javascript')
     pass
 
@@ -154,16 +192,14 @@ def ajax_upd_vip(request):
 @log
 @check_daemon
 def ajax_get_member_list(request):
-    #sync_member()
-    #sync_flow()
+    global member_dict
+    global flow_dict
     from django.core import serializers
-    for member in LBMember.objects.all():
-        member.set_flow_list()
-        member.save()
-    member_list = serializers.serialize('json', LBMember.objects.all())
+    member_list = serializers.serialize('json', member_dict.values())
     #print member_list
-    #flow_list = serializers.serialize('json', LBFlow.objects.all())
+    flow_list = serializers.serialize('json', flow_dict.values())
     #print flow_list
-    return HttpResponse(member_list, mimetype='application/javascript')
+    resdata = '{"member_list" : %s, "flow_list" : %s}' % (member_list, flow_list)
+    return HttpResponse(resdata, mimetype='application/javascript')
     pass
 

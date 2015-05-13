@@ -4,14 +4,14 @@ import socket, struct
 
 # Create your models here.
 class Host(models.Model):
-    hid = models.AutoField(primary_key=True) 
+    hid = models.CharField(max_length=17, primary_key=True)
     ipv4 = models.CharField(max_length=17, null=True)
     mac = models.CharField(max_length=18, null=True)
     #
     fresh = models.BooleanField(default=True)
 
     def __unicode__(self,):
-      return 'Host %d, ip: %s, mac: %s' % (self.hid, self.ipv4, self.mac,)
+      return 'Host ip: %s, mac: %s' % (self.ipv4, self.mac,)
 
 class LBVip(models.Model):
     vid = models.CharField(max_length=17, primary_key=True)
@@ -39,7 +39,8 @@ class LBPool(models.Model):
     pid = models.CharField(max_length=17, primary_key=True)
     name = models.CharField(max_length=20, null=True)
     protocol = models.CharField(max_length=10, null=True)
-    vip = models.ForeignKey(LBVip)
+    #vip = models.ForeignKey(LBVip)
+    vip = models.CharField(max_length=17)
     #
     fresh = models.BooleanField(default=True)
     
@@ -53,7 +54,8 @@ class LBMember(models.Model):
     address = models.CharField(max_length=17, null=True)
     naddress = models.CharField(max_length=17, null=True)
     port = models.CharField(max_length=10, null=True)
-    pool = models.ForeignKey(LBPool)
+    #pool = models.ForeignKey(LBPool)
+    pool = models.CharField(max_length=17)
     #server status
     req_count = models.IntegerField(default=0)
     kb_count = models.IntegerField(default=0)
@@ -64,11 +66,12 @@ class LBMember(models.Model):
     byte_per_req = models.FloatField(default=0)
     busy_workers = models.IntegerField(default=0)
     idle_workers = models.IntegerField(default=0)
+    weight = models.FloatField(default=0)
     update_time = models.CharField(max_length=20, default='-1')
     #
     fresh = models.BooleanField(default=True)
     #
-    flow_list = models.CharField(max_length=5217, null=True)
+    flow_list = []
     
     @property
     def naddress(self,):
@@ -82,43 +85,23 @@ class LBMember(models.Model):
     def __unicode__(self,):
       return 'LBMember %s[%s:%s]' % (self.mid, self.naddress, self.port)
 
-    def set_flow_list(self,):
-        flow_list = self.lbflow_set.all()
-        tmp_flow_list = '['
-        first = True
-        for flow in flow_list:
-          if not first:
-            tmp_flow_list += ','
-          f = '{"fid":"%s","packet_count":"%s","duraction":"%s"}' % (flow.fid, flow.packet_count, flow.duraction)
-          tmp_flow_list += f
-          first = False
-        tmp_flow_list += "]"
-        #print 'flow_list:', tmp_flow_list
-        self.flow_list = tmp_flow_list
-
 class LBFlow(models.Model):
+    #fid = vip + client
+    #'vip~1;client~128.0.0.10'
     fid = models.CharField(max_length=217, primary_key=True)
+    old_req_count = models.FloatField(default=0.0)
+    old_duraction = models.FloatField(default=0.0)
+    req_count = models.FloatField(default=0.0)
+    duraction = models.FloatField(default=0.0)
     weight = models.FloatField(default=1.0)
-    #member = models.CharField(max_length=17)
-    member = models.ForeignKey(LBMember)
+    #member = models.ForeignKey(LBMember)
+    member = models.CharField(max_length=17)
 
-    @property
-    def inbound_entry_list(self,):
-        #print 'len(entry):', len(self.lbflowentry_set.all())
-        return [ entry for entry in self.lbflowentry_set.all() if entry.eid.find('inbound') >= 0]
+    inbound_entry_list = []
+    outbound_entry_list = []
 
-    @property
-    def outbound_entry_list(self,):
-        #print 'len(entry):', len(self.lbflowentry_set.all())
-        return [ entry for entry in self.lbflowentry_set.all() if entry.eid.find('outbound') >= 0]
-
-    @property
-    def packet_count(self,):
-        return self.outbound_entry_list[0].packet_count
-
-    @property
-    def duraction(self,):
-        return self.outbound_entry_list[0].duraction
+    def __unicode__(self,):
+        return 'flow: %s' % (self.fid,)
 
     def get_mid(self,):
         inbound_list = self.inbound_entry_list
@@ -151,7 +134,8 @@ class LBFlowEntry(models.Model):
     eid = models.CharField(max_length=217, primary_key=True)
     info1 = models.CharField(max_length=1117, null=True)
     info2 = models.CharField(max_length=1117, null=True)
-    flow = models.ForeignKey(LBFlow)
+    #flow = models.ForeignKey(LBFlow)
+    flow = models.CharField(max_length=217)
     
     def __unicode__(self,):
         return 'entry: %s' % (self.eid,)

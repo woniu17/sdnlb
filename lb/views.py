@@ -8,6 +8,7 @@ import json
 import monitor
 from tool import *
 import time
+import json
 
 def check_daemon(f):
     @functools.wraps(f)
@@ -54,7 +55,8 @@ def home(request):
     global vip_dict
     global pool_dict
     global log_list
-    return render(request, 'lb/index.html', {'host_list':host_dict.values(), 'vip_list':vip_dict.values(), 'pool_list':pool_dict.values(), 'log_list':log_list})
+    host_list = sorted(host_dict.values(), key=lambda h: h.mac)
+    return render(request, 'lb/index.html', {'host_list':host_list, 'vip_list':vip_dict.values(), 'pool_list':pool_dict.values(),})
 
 @log
 @check_daemon
@@ -78,7 +80,10 @@ def ajax_del_member(request):
         action = 'del %s' % (flow,)
         actions.append(action)
 
-    status_reason_resdata = del_member(mid)
+    #status_reason_resdata = del_member(mid)
+    m = member
+    m_ = '{"id":"'+m.mid+'", "pool_id":"'+m.pool+'", "address":"'+m.naddress+'", "port":"'+m.port+'", "run_status":"1"}'
+    status_reason_resdata = upd_member(m_)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_resdata
     actions.append(event)
     global log_list
@@ -194,12 +199,16 @@ def ajax_upd_vip(request):
 def ajax_get_member_list(request):
     global member_dict
     global flow_dict
+    global log_list
     from django.core import serializers
-    member_list = serializers.serialize('json', member_dict.values())
+    member_list = sorted(member_dict.values(), key=lambda m: m.mid)
+    member_list = serializers.serialize('json',member_list )
     #print member_list
-    flow_list = serializers.serialize('json', flow_dict.values())
+    flow_list = sorted(flow_dict.values(), key=lambda f: f.fid)
+    flow_list = serializers.serialize('json',flow_list )
     #print flow_list
-    resdata = '{"member_list" : %s, "flow_list" : %s}' % (member_list, flow_list)
+    log_list_ = json.dumps(log_list)
+    resdata = '{"member_list" : %s, "flow_list" : %s, "log_list":%s}' % (member_list, flow_list, log_list_)
     return HttpResponse(resdata, mimetype='application/javascript')
     pass
 

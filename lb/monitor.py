@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys,os
+import time
 import commands
 import threading, time
 import httplib, urllib
@@ -49,6 +50,25 @@ def update_server_status(member, server_status):
     i = i+1
     pass
 
+def balance_algorithm():
+    print 'balance algorithm!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    global flow_dict
+    global log_list
+    to_delete_flow_list = get_to_delete_flow_list()
+    if len(to_delete_flow_list) <= 0 :
+        return False
+    event = 'execute balance algorithm because of unbalanced status'
+    actions = []
+    for flow in to_delete_flow_list :
+        print flow
+        del_flow(flow)
+        action = 'del %s' % (flow,)
+        print 'action:', action
+        actions.append(action)
+        del flow_dict[flow.fid]
+    log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
+    log_list.append(log)
+
 '''
 sync member, flow
 so when add/del/update member or flow, pause it
@@ -59,7 +79,9 @@ def member_monitor():
     if PAUSE_MONITOR:
         print 'PAUSE MONITOR!!!!!!!!!!!!!'
         return
+    #sync flow statistic
     sync_flow()
+    #update server status
     for mid, member in member_dict.iteritems():
         #TODO about synchronization
         host = member.naddress
@@ -75,6 +97,8 @@ def member_monitor():
         conn.close()
         if status == 200 :
             update_server_status(member, resdata)
+    #check if is blanced
+    balance_algorithm()
     return
 
 def monitor_daemon(right_now):

@@ -216,7 +216,7 @@ def sync_member():
         print 'sync member fail!!'
         return
     member_list = json.loads(resdata)
-    print 'member_list.length:' , len(member_list)
+    #print 'member_list.length:' , len(member_list)
 
     #set all LBMember unfresh
     for mid, member in member_dict.iteritems():
@@ -228,6 +228,7 @@ def sync_member():
         '''
     #refresh LBMember
     for member in member_list:
+        print 'member:', member
         mid = member['id']
         if mid not in member_dict:
             member_dict[mid] = LBMember()
@@ -237,6 +238,7 @@ def sync_member():
         m.port = member['port']
         #m.pool = pool_dict[member['poolId']]
         m.pool = member['poolId']
+        m.run_status = member['runStatus']
         m.fresh = True
         '''
     print 'after fresh all members'
@@ -613,13 +615,19 @@ def del_flow(flow):
 def get_to_delete_flow_list():
      global flow_dict
      global member_dict
+     active_member_dict = {}
+     for mid, member in member_dict.iteritems():
+         if member.is_active():
+             active_member_dict[mid] = member
+     if len(active_member_dict) <= 0 or len(flow_dict) <= 0 :
+        return []
      to_delete_flow_list = []
      avg_weight = 0.0
-     for mid, member in member_dict.iteritems():
+     for mid, member in active_member_dict.iteritems():
          avg_weight += member.weight
-     avg_weight /= len(member_dict)
+     avg_weight /= len(active_member_dict)
      for fid, flow in flow_dict.iteritems():
-         member = member_dict[flow.member]
+         member = active_member_dict[flow.member]
          if member.weight <= avg_weight:
              continue
          d1 = member.weight - avg_weight

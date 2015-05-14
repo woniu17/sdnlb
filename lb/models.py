@@ -50,12 +50,18 @@ class LBPool(models.Model):
 
 
 class LBMember(models.Model):
+    RUNSTATUS_ACTIVE = 0
+    RUNSTATUS_STANDBY = 1
+    RUNSTATUS_TOSTOP = 2
+    RUNSTATUS_FAIL = 3
+
     mid = models.CharField(max_length=17, primary_key=True)
     address = models.CharField(max_length=17, null=True)
     naddress = models.CharField(max_length=17, null=True)
     port = models.CharField(max_length=10, null=True)
     #pool = models.ForeignKey(LBPool)
     pool = models.CharField(max_length=17)
+    run_status = models.IntegerField(default=0)
     #server status
     req_count = models.IntegerField(default=0)
     kb_count = models.IntegerField(default=0)
@@ -84,6 +90,9 @@ class LBMember(models.Model):
     
     def __unicode__(self,):
       return 'LBMember %s[%s:%s]' % (self.mid, self.naddress, self.port)
+
+    def is_active(self,):
+      return (self.run_status == LBMember.RUNSTATUS_ACTIVE)
 
 class LBFlow(models.Model):
     #fid = vip + client

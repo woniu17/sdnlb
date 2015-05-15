@@ -71,6 +71,15 @@ def ajax_del_member(request):
     #log event
     event = 'del member %s:%s' % (member.mid, member.port)
     actions = []
+    #set to-del member's runstatus TOSTOP, that make sure new flow would not go to to-del member
+    m = member
+    rs = LBMember.RUNSTATUS_TOSTOP
+    m_ = '{"id":"%s", "pool_id":"%s", "address":"%s", "port":"%s", "run_status":"%s"}' % (m.mid, m.pool, m.naddress, m.port, rs)
+    status_reason_resdata = upd_member(m_)
+    action = 'make %s into %s status' % (m, LBMember.STR_RUNSTATUS[rs])
+    actions.append(action)
+    #del flows which go to to-del member
+    sync_flow()
     for fid, flow in flow_dict.items():
         if flow.member != mid:
             continue
@@ -80,15 +89,14 @@ def ajax_del_member(request):
         action = 'del %s' % (flow,)
         actions.append(action)
 
-    #status_reason_resdata = del_member(mid)
-    m = member
-    m_ = '{"id":"'+m.mid+'", "pool_id":"'+m.pool+'", "address":"'+m.naddress+'", "port":"'+m.port+'", "run_status":"1"}'
-    status_reason_resdata = upd_member(m_)
+    #safely remove to-del member
+    status_reason_resdata = del_member(mid)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_resdata
     actions.append(event)
     global log_list
     log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
     log_list.append(log)
+    #sync member and flow
     sync_member()
     sync_flow()
     monitor.PAUSE_MONITOR = False
@@ -141,7 +149,7 @@ def ajax_add_member(request):
     #delete some flow
     for mid, member in member_dict.iteritems():
         print member, member.weight
-    to_delete_flow_list = get_to_delete_flow_list()
+    to_delete_flow_list = monitor.get_to_delete_flow_list()
     for flow in to_delete_flow_list:
         print flow, flow.member
         del_flow(flow)

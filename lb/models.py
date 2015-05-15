@@ -55,6 +55,8 @@ class LBMember(models.Model):
     RUNSTATUS_TOSTOP = 2
     RUNSTATUS_FAIL = 3
 
+    STR_RUNSTATUS = ['active', 'standby', 'tostop', 'fail']
+
     mid = models.CharField(max_length=17, primary_key=True)
     address = models.CharField(max_length=17, null=True)
     naddress = models.CharField(max_length=17, null=True)
@@ -93,6 +95,15 @@ class LBMember(models.Model):
 
     def is_active(self,):
       return (self.run_status == LBMember.RUNSTATUS_ACTIVE)
+
+    def is_standby(self,):
+      return (self.run_status == LBMember.RUNSTATUS_STANDBY)
+
+    def is_tostop(self,):
+      return (self.run_status == LBMember.RUNSTATUS_TOSTOP)
+
+    def is_fail(self,):
+      return (self.run_status == LBMember.RUNSTATUS_FAIL)
 
 class LBFlow(models.Model):
     #fid = vip + client

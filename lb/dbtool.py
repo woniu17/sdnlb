@@ -238,7 +238,7 @@ def sync_member():
         m.port = member['port']
         #m.pool = pool_dict[member['poolId']]
         m.pool = member['poolId']
-        m.run_status = member['runStatus']
+        m.run_status = int(member['runStatus'])
         m.fresh = True
         '''
     print 'after fresh all members'
@@ -611,29 +611,3 @@ def del_flow(flow):
             print 'fail to del flow entry %s!!!!' % (entry.eid,) 
     #return status, reason, resdata
     return 'OK'
-  
-def get_to_delete_flow_list():
-     global flow_dict
-     global member_dict
-     active_member_dict = {}
-     for mid, member in member_dict.iteritems():
-         if member.is_active():
-             active_member_dict[mid] = member
-     if len(active_member_dict) <= 0 or len(flow_dict) <= 0 :
-        return []
-     to_delete_flow_list = []
-     avg_weight = 0.0
-     for mid, member in active_member_dict.iteritems():
-         avg_weight += member.weight
-     avg_weight /= len(active_member_dict)
-     for fid, flow in flow_dict.iteritems():
-         member = active_member_dict[flow.member]
-         if member.weight <= avg_weight:
-             continue
-         d1 = member.weight - avg_weight
-         d2 = avg_weight - (member.weight - flow.weight)
-         if d2 >= d1 :
-           continue
-         member.weight -= flow.weight
-         to_delete_flow_list.append(flow)
-     return to_delete_flow_list

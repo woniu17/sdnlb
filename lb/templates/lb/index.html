@@ -34,6 +34,11 @@
           });
           var cancle_update = false;
           function bind_event_for_member(){
+              // member detail
+              $('.member').click(function(){
+                  $(this).children('.flow_list_title').toggle();
+                  $(this).children('.flow_list').toggle();
+              });
               // delete member
               $('.member_deletion_button').click(function(){
                   cancle_update = true;
@@ -93,11 +98,16 @@
                             $('#template .member > span.busy_workers').html(m['fields']['busy_workers']);
                             $('#template .member > span.idle_workers').html(m['fields']['idle_workers']);
                             $('#template .member > span.update_time').html(m['fields']['update_time']);
-                            $('#template .member > span.run_status').html(m['fields']['run_status']);
+                            var rs = new Array();
+                            rs['0'] = 'Active';
+                            rs['1'] = 'Standby';
+                            rs['2'] = 'ToStop';
+                            rs['3'] = 'Fail';
+                            $('#template .member > span.run_status').html(rs[m['fields']['run_status']]);
                             $('#template .member > .flow_list .flow').remove();
                             //console.log('flow_list:' + flow_list);
-                            var weight = 0.0
-                            var num = 0
+                            var weight = 0.0;
+                            var num = 0;
                             for (var j=0; j<flow_list.length; j++){
                                 var f = flow_list[j];
                                 if (f['fields']['member'] != m['pk']){
@@ -151,6 +161,18 @@
               });
           }
           $(document).ready(function(){
+              // host list
+              $('.host_list_title').click(function(){
+                  $('.host_list').toggle();
+              });
+              // vip list
+              $('.vip_list_title').click(function(){
+                  $('.vip_list').toggle();
+              });
+              // event list
+              $('.event_list_title').click(function(){
+                  $('.event_list').toggle();
+              });
               // modify vip
               $('.vip_modifition_button').click(function(){
                   var vid = $(this).parents('.vip').attr('vid');
@@ -168,7 +190,9 @@
               $('.member_addition_button').click(function(){
                   cancle_update = true;
                   var ipv4 = $(this).parents('.host').attr('ipv4');
-                  var port = $(this).parents('.host').attr('port');
+                  //var port = $(this).parents('.host').attr('port');
+                  var port = $(this).siblings('.port').val();
+                  console.log('port: ' + port);
                   var mid = ipv4;
                   var pid = $('.pool').attr('pid');
                   var member_list = $('.member');
@@ -208,9 +232,9 @@
               $('#update').click(function(){
                   var checked = $(this).is(':checked');
                   if (checked){
-                     console.log('update checked');
+                     //console.log('update checked');
                   } else {
-                     console.log('update is not checked');
+                     //console.log('update is not checked');
                   }
                   cancle_update = !checked;
               });
@@ -237,7 +261,7 @@
     <span class="update_time w80"></span>
     <span class="w80"><input type="button" value="删除" class="member_deletion_button"/></span>
     <span class="w80"><input type="button" value="修改" class="member_modifition_button hidden"/></span>
-    <div class="flow_list_title">
+    <div class="flow_list_title hidden">
         <span class="w80">流水号</span>
         <span class="w190">Flow ID</span>
         <span class="w90">OldReqCount</span>
@@ -246,7 +270,7 @@
         <span class="w90">Duraction</span>
         <span class="w80">Weight(FC/D)</span>
     </div>
-    <div class="flow_list">
+    <div class="flow_list hidden">
     </div>
   </div>
   <div class="flow">
@@ -261,22 +285,28 @@
 </div>
 
         
-        <span class="app_title">Hello, This is Load Balancer APP!</span> 
-        <span style="position:absolute; right:100px;"><input type="checkbox" checked="true" id="update">Live updates
-        </span>
+        <div>
+            <span class="app_title">Hello, This is Load Balancer APP!</span> 
+            <span style="position:absolute; right:100px;"><input type="checkbox" checked="true" id="update">Live updates</span>
+        </div>
         <hr/>
-        <span class="content_title">Host list</span>
+        <div>
+            <span class="content_title host_list_title">Host list</span>
+        </div>
         <div class="host_list">
         {% for h in host_list %}
         <div class="host" ipv4="{{h.ipv4}}" port="80">
                 <span>{{h}}</span>
+                    &nbsp;&nbsp;<input type="text" value="80" size="5" class="port"/>
                     &nbsp;&nbsp;<input type="button" value="添加" class="member_addition_button"/>
             </div>
         {% endfor %}
         </div>
         <hr/>
+        <div>
+            <span class="content_title vip_list_title">VIP list</span>
+        </div>
         <div class="vip_list">
-        <span class="content_title">VIP list</span>
         {% for vip in vip_list %}
         <div class="vip" vid="{{vip.vid}}">
                 <span>{{vip}}</span>
@@ -312,7 +342,7 @@
         </div>
         <hr/> 
         <div>
-          <span class="content_title">Event Log</span>
+          <span class="content_title event_list_title">Event Log</span>
         </div>
         <div class="event_list" id="event_list">
         <div>

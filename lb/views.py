@@ -68,8 +68,6 @@ def ajax_del_member(request):
       return HttpResponse('{"status":"-1", "reason":"form has not mid","data":"no"}', mimetype='application/javascript')
     mid = request.POST['mid']
     member = member_dict[mid]
-    #log event
-    event = 'del member %s:%s' % (member.mid, member.port)
     actions = []
     #set to-del member's runstatus TOSTOP, that make sure new flow would not go to to-del member
     m = member
@@ -79,19 +77,15 @@ def ajax_del_member(request):
     action = 'make %s into %s status' % (m, LBMember.STR_RUNSTATUS[rs])
     actions.append(action)
     #del flows which go to to-del member
-    sync_flow()
-    for fid, flow in flow_dict.items():
-        if flow.member != mid:
-            continue
-        #print 'flow', flow.fid
-        del_flow(flow)
-        del flow_dict[fid]
-        action = 'del %s' % (flow,)
-        actions.append(action)
-
+    actions_ = del_flow_by_mid(mid)
+    actions.extend(actions_)
     #safely remove to-del member
     status_reason_resdata = del_member(mid)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_resdata
+    #delay dynamic provision to make sure that flows have been redistribute
+    monitor.DELAY_DYNAMIC_PROVISION = 2
+    #log event
+    event = 'del member %s:%s' % (member.mid, member.port)
     actions.append(event)
     global log_list
     log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
@@ -118,6 +112,7 @@ def ajax_del_vip(request):
 def ajax_add_member(request):
     global member_dict
     global flow_dict
+    #check data's validation
     if 'member' not in request.POST:
         res = '{"status":"-1", "reason":"form has not member","data":"no"}'
         print 'res:', res
@@ -130,34 +125,28 @@ def ajax_add_member(request):
         print 'res:', res
         return HttpResponse(res, mimetype='application/javascript')
     mid = member_['id']
+    #if mid is exist, deny to add member
     if mid in member_dict:
         res = '{"status":"-1", "reason":"member %s has exsit","data":"no"}' % (member,)
         print 'res:', res
         return HttpResponse(res, mimetype='application/javascript')
+    #add member
     monitor.PAUSE_MONITOR = True
     member_dict[mid] = LBMember()
     member_dict[mid].mid = mid
-        
     status_reason_data = add_member(member)
     res = '{"status":"%s", "reason":"%s", "data":"%s"}' % status_reason_data
     print 'res:', res
     sync_member()
+    #execute balance_member_weight
+    actions_ = monitor.balance_member_weight()
+    #delay dynamic provision to make sure that flows have been redistribute
+    monitor.DELAY_DYNAMIC_PROVISION = 2
     #log event
     event = 'add member %s:%s' % (member_['id'], member_['port'])
     actions = []
     actions.append(event)
-    #delete some flow
-    for mid, member in member_dict.iteritems():
-        print member, member.weight
-    to_delete_flow_list = monitor.get_to_delete_flow_list()
-    for flow in to_delete_flow_list:
-        print flow, flow.member
-        del_flow(flow)
-        action = 'del %s' % (flow,)
-        print 'action:', action
-        actions.append(action)
-        del flow_dict[flow.fid]
-
+    actions.extend(actions_)
     global log_list
     log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
     log_list.append(log)

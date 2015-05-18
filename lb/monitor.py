@@ -10,7 +10,8 @@ from dbtool import *
 
 MONITOR_DAEMON = None
 PAUSE_MONITOR = False
-dynamic_provision = True
+DYNAMIC_PROVISION = True
+DELAY_DYNAMIC_PROVISION = 0
 
 def update_server_status(member, server_status):
     #print server_status
@@ -51,31 +52,62 @@ def update_server_status(member, server_status):
     i = i+1
     pass
 
-def get_to_delete_flow_list():
+def determine_balance():
      global flow_dict
      global member_dict
      active_member_dict = {}
      for mid, member in member_dict.iteritems():
          if member.is_active():
              active_member_dict[mid] = member
-     if len(active_member_dict) <= 0 or len(flow_dict) <= 0 :
-        return []
-     to_delete_flow_list = []
-     avg_weight = 0.0
+     if len(active_member_dict) <= 1 :
+          return True
+     min_weight = 100000000
+     max_weight = 0
      for mid, member in active_member_dict.iteritems():
-         avg_weight += member.weight
-     avg_weight /= len(active_member_dict)
-     for fid, flow in flow_dict.iteritems():
-         member = active_member_dict[flow.member]
-         if member.weight <= avg_weight:
-             continue
-         d1 = member.weight - avg_weight
-         d2 = avg_weight - (member.weight - flow.weight)
-         if d2 >= d1 :
-           continue
-         member.weight -= flow.weight
-         to_delete_flow_list.append(flow)
-     return to_delete_flow_list
+         if member.weight < min_weight :
+             min_weight = member.weight
+         if member.weight > max_weight :
+             max_weight = member.weight
+     #determine if balance
+     return (max_weight - min_weight ) < 3
+
+
+def balance_member_weight():
+    global flow_dict
+    global member_dict
+    #get active member
+    active_member_dict = {}
+    for mid, member in member_dict.iteritems():
+        if member.is_active():
+            active_member_dict[mid] = member
+    if len(active_member_dict) <= 0 or len(flow_dict) <= 0 :
+       return [] #no actions
+    #get average weight among members
+    avg_weight = 0.0
+    for mid, member in active_member_dict.iteritems():
+        avg_weight += member.weight
+    avg_weight /= len(active_member_dict)
+    #get flows which make load balance after being deleted
+    to_delete_flow_list = []
+    for fid, flow in flow_dict.iteritems():
+        member = active_member_dict[flow.member]
+        if member.weight <= avg_weight:
+            continue
+        d1 = member.weight - avg_weight
+        d2 = avg_weight - (member.weight - flow.weight)
+        if d2 >= d1 :
+          continue
+        member.weight -= flow.weight
+        to_delete_flow_list.append(flow)
+    #delete flows
+    actions = []
+    for flow in to_delete_flow_list :
+        del_flow(flow)
+        action = 'del %s' % (flow,)
+        print 'action:', action
+        actions.append(action)
+        del flow_dict[flow.fid]
+    return actions
 
 '''
 benchmark load of cluster
@@ -97,7 +129,7 @@ def benchmark():
              break
      #select the active member with maximal weight to standby if low load
      active_member = None
-     max_weight = 0.0
+     max_weight = -1
      for mid, member in active_member_dict.iteritems():
           if max_weight < member.weight :
               active_member = member
@@ -109,7 +141,7 @@ def benchmark():
      if len(active_member_dict) > 0 :
         avg_weight /= len(active_member_dict)
 
-     if avg_weight < 25 and len(active_member_dict)>2 :
+     if avg_weight < 25 and len(active_member_dict) > 2 :
          return (-1, active_member)
      if avg_weight > 44 :
          return (1, standby_member)
@@ -117,7 +149,6 @@ def benchmark():
 
 def standby_member(member):
     print 'standby', member
-    event = 'dynamic provision, standby %s' % (member,)
     #set to-standby member's runstatus STANDBY, that make sure new flow would not go to to-standby member
     actions = []
     m = member
@@ -128,16 +159,11 @@ def standby_member(member):
     print 'action:', action
     actions.append(action)
     #del flows which go to to-standby member
-    sync_flow()
-    global flow_dict
-    for fid, flow in flow_dict.items():
-        if flow.member != m.mid:
-            continue
-        del_flow(flow)
-        del flow_dict[fid]
-        action = 'del %s' % (flow,)
-        actions.append(action)
+    actions_ = del_flow_by_mid(m.mid)
+    actions.extend(actions_)
+    #log event
     global log_list
+    event = 'dynamic provision, standby %s' % (member,)
     log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
     log_list.append(log)
     sync_member()
@@ -159,49 +185,28 @@ def active_member(member):
     log_list.append(log)
     sync_member()
 
-def balance_algorithm():
-    print 'balance algorithm!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    global flow_dict
-    global log_list
-    if dynamic_provision :
-        print 'dynamic_provision!!!!!!!!!!!!!!!!!!!!!!!!!'
-        res = benchmark()
-        if res[0] < 0 and res[1] :
-            standby_member(res[1])
-        elif res[0] > 0 and res[1] :
-            active_member(res[1])
-            return
-            '''
-            do not balance now, it will delete some flow because of the new active member
-            '''
-
-    to_delete_flow_list = get_to_delete_flow_list()
-    if len(to_delete_flow_list) <= 0 :
-        return False
-    event = 'execute balance algorithm because of unbalanced status'
-    actions = []
-    for flow in to_delete_flow_list :
-        del_flow(flow)
-        action = 'del %s' % (flow,)
-        print 'action:', action
-        actions.append(action)
-        del flow_dict[flow.fid]
-    log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
-    log_list.append(log)
+def dynamic_provision():
+    print 'DYNAMIC_PROVISION!!!!!!!!!!!!!!!!!!!!!!!!!'
+    res = benchmark()
+    print res
+    if res[0] < 0 and res[1] :
+        standby_member(res[1])
+    elif res[0] > 0 and res[1] :
+        active_member(res[1])
+    #delay dynamic provision to make sure that flows have been redistribute
+    global DELAY_DYNAMIC_PROVISION
+    if res[0] != 0 :
+        DELAY_DYNAMIC_PROVISION = 2
 
 '''
 sync member, flow
 so when add/del/update member or flow, pause it
 '''
 def member_monitor():
-    global member_dict
-    global PAUSE_MONITOR
-    if PAUSE_MONITOR:
-        print 'PAUSE MONITOR!!!!!!!!!!!!!'
-        return
     #sync flow statistic
     sync_flow()
     #update server status
+    global member_dict
     for mid, member in member_dict.iteritems():
         #TODO about synchronization
         host = '%s:%s' % (member.naddress, member.port)
@@ -217,21 +222,39 @@ def member_monitor():
         conn.close()
         if status == 200 :
             update_server_status(member, resdata)
-    #check if is blanced
-    balance_algorithm()
-    return
+    #dynamic provision
+    global DELAY_DYNAMIC_PROVISION
+    if DYNAMIC_PROVISION :
+        #delay dynamic provision to make sure that flows have been redistribute
+        if DELAY_DYNAMIC_PROVISION > 0 :
+            DELAY_DYNAMIC_PROVISION -= 1
+        else :
+            dynamic_provision()
+
+    #balance algorithm
+    balance = determine_balance()
+    if balance is True :
+        return
+    print 'balance member weight!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    event = 'execute balance algorithm because of unbalanced status'
+    actions = balance_member_weight()
+    log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
+    global log_list
+    log_list.append(log)
 
 def monitor_daemon(right_now):
+    global PAUSE_MONITOR
     current_thread = threading.currentThread()
+    print '[At %s, %s] monitor daemon...' % (current_thread, time.strftime('%H:%M:%S'))
     if right_now:
-        print '[At %s, %s] start  geting server status from member server...' % (current_thread, time.strftime('%H:%M:%S'))
-        member_monitor()
-        print '[At %s, %s] finish geting server status from member server...' % (current_thread, time.strftime('%H:%M:%S'))
+        if PAUSE_MONITOR:
+            print 'PAUSE MONITOR!!!!!!!!!!!!!'
+        else :
+            member_monitor()
         time.sleep(10)
     global MONITOR_DAEMON
     MONITOR_DAEMON = threading.Thread(target=monitor_daemon, args=(True,) )
     MONITOR_DAEMON.setDaemon(True)
-    print '[At %s, %s] start daemon %s' % (current_thread, time.strftime('%H:%M:%S'), MONITOR_DAEMON,)
     MONITOR_DAEMON.start()
     return
     

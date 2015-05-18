@@ -611,3 +611,17 @@ def del_flow(flow):
             print 'fail to del flow entry %s!!!!' % (entry.eid,) 
     #return status, reason, resdata
     return 'OK'
+@log
+def del_flow_by_mid(mid):
+    sync_flow()
+    global flow_dict
+    actions = []
+    for fid, flow in flow_dict.items():
+        if flow.member != mid:
+            continue
+        #print 'flow', flow.fid
+        del_flow(flow)
+        del flow_dict[fid]
+        action = 'del %s' % (flow,)
+        actions.append(action)
+    return actions

@@ -18,10 +18,14 @@ def sendhttp(host, url='/', data=None, method='GET', headers=None):
     if method == 'PUT' or method == 'POST':
         #headers = { 'Content-type':'application/javascript', 'Accept':'text/plain', }
         pass
-    conn = httplib.HTTPConnection(host)
+    try:
+        conn = httplib.HTTPConnection(host)
+        conn.request(method, url, data,)
+    except Exception as e:
+        print type(e), e
+        return None
     #print 'method:', method, 'host:', host, 'url:',url, 'data:', data
     #conn.request(method, url, data, headers)
-    conn.request(method, url, data,)
     return conn
 
 @log
@@ -228,7 +232,7 @@ def sync_member():
         '''
     #refresh LBMember
     for member in member_list:
-        print 'member:', member
+        #print 'member:', member
         mid = member['id']
         if mid not in member_dict:
             member_dict[mid] = LBMember()
@@ -440,6 +444,25 @@ def sync_flow():
     for fid, flow in flow_dict.iteritems():
          flow.req_count = float(flow.outbound_entry_list[-1].packet_count) / 4.0
          flow.duraction = float(flow.outbound_entry_list[-1].duraction)
+         flow.old_in_pkt = flow.in_pkt
+         flow.old_out_pkt = flow.out_pkt
+         flow.in_pkt = flow.inbound_entry_list[-1].packet_count
+         flow.out_pkt = flow.outbound_entry_list[-1].packet_count
+         #first sample
+         if flow.old_in_pkt < 0:
+             flow.old_in_pkt = flow.in_pkt
+             flow.old_out_pkt = flow.out_pkt
+    #set member's is_fail_by_flow 
+    for mid, member in member_dict.iteritems():
+        fail_flow_cnt = 0
+        for flow in member.flow_list:
+            in_pkt = abs(flow.in_pkt - flow.old_in_pkt)
+            out_pkt = abs(flow.out_pkt - flow.old_out_pkt)
+            if(in_pkt > 4 and out_pkt == 0):
+                fail_flow_cnt += 1
+        member.is_fail_by_flow = (fail_flow_cnt >= 2)
+        #print member, member.is_fail_by_flow
+
     for fid, flow in flow_dict.iteritems():
          d = flow.duraction - flow.old_duraction 
          r = flow.req_count - flow.old_req_count

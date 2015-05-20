@@ -204,6 +204,9 @@ so when add/del/update member or flow, pause it
 '''
 def member_monitor():
     #sync flow statistic
+    sync_vip()
+    sync_pool()
+    sync_member()
     sync_flow()
     #update server status
     global member_dict
@@ -213,15 +216,15 @@ def member_monitor():
         url = '/server-status?auto'
         method = 'GET'
         data = None
-        conn = httplib.HTTPConnection(host)
-        conn.request(method, url, data,)
-        httpres = conn.getresponse()
-        status = httpres.status
-        reason = httpres.reason
-        resdata = httpres.read()
-        conn.close()
-        if status == 200 :
-            update_server_status(member, resdata)
+        conn = sendhttp(host, url, data, method)
+        if conn is not None :
+            httpres = conn.getresponse()
+            status = httpres.status
+            reason = httpres.reason
+            resdata = httpres.read()
+            conn.close()
+            if status == 200 :
+                update_server_status(member, resdata)
     #dynamic provision
     global DELAY_DYNAMIC_PROVISION
     if DYNAMIC_PROVISION :

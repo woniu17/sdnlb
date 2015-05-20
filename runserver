@@ -1,3 +1,4 @@
+#!/bin/bash
 rm /tmp/sdnlb.db
 mysql -uroot -p123 -e"drop database if exists sdnlb;"
 mysql -uroot -p123 -e"create database sdnlb;"

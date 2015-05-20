@@ -80,6 +80,7 @@ class LBMember(models.Model):
     fresh = models.BooleanField(default=True)
     #
     flow_list = []
+    is_fail_by_flow = models.BooleanField(default=False)
     
     @property
     def naddress(self,):
@@ -116,6 +117,10 @@ class LBFlow(models.Model):
     weight = models.FloatField(default=1.0)
     #member = models.ForeignKey(LBMember)
     member = models.CharField(max_length=17)
+    old_in_pkt = models.IntegerField(default=-1)
+    in_pkt = models.IntegerField(default=-1)
+    old_out_pkt = models.IntegerField(default=-1)
+    out_pkt = models.IntegerField(default=-1)
 
     inbound_entry_list = []
     outbound_entry_list = []
@@ -188,7 +193,7 @@ class LBFlowEntry(models.Model):
       '''
       #print 'self.info2:', self.info2 , type(self.info2)
       info2 = eval(self.info2)
-      return info2['packetCount']
+      return int(info2['packetCount'])
     
     @property
     def duraction(self,):

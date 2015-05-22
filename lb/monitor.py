@@ -11,6 +11,7 @@ from dbtool import *
 MONITOR_DAEMON = None
 PAUSE_MONITOR = False
 DYNAMIC_PROVISION = True
+#DYNAMIC_PROVISION = False
 DELAY_DYNAMIC_PROVISION = 0
 
 def update_server_status(member, server_status):
@@ -198,6 +199,34 @@ def dynamic_provision():
     if res[0] != 0 :
         DELAY_DYNAMIC_PROVISION = 2
 
+def fail_member(member):
+    print 'fail', member
+    #set fail member's runstatus FAIL
+    actions = []
+    m = member
+    rs = LBMember.RUNSTATUS_FAIL
+    m_ = '{"id":"%s", "pool_id":"%s", "address":"%s", "port":"%s", "run_status":"%s"}' % (m.mid, m.pool, m.naddress, m.port, rs)
+    status_reason_resdata = upd_member(m_)
+    action = 'make %s into %s status' % (m, LBMember.STR_RUNSTATUS[rs])
+    print 'action:', action
+    actions.append(action)
+    #del flows which go to to-standby member
+    actions_ = del_flow_by_mid(m.mid)
+    actions.extend(actions_)
+    #log event
+    global log_list
+    event = 'failure dectection, fail %s' % (member,)
+    log = {'time':time.strftime('%H:%M:%S'), 'event':event, 'actions':actions}
+    log_list.append(log)
+    sync_member()
+
+def detect_failure():
+    print 'detect failure'
+    global member_dict
+    for mid, member in member_dict.iteritems():
+        if member.is_fail_by_flow :
+            fail_member(member)
+
 '''
 sync member, flow
 so when add/del/update member or flow, pause it
@@ -208,6 +237,8 @@ def member_monitor():
     sync_pool()
     sync_member()
     sync_flow()
+    #detect failure
+    detect_failure()
     #update server status
     global member_dict
     for mid, member in member_dict.iteritems():
